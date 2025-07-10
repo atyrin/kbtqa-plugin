@@ -1,0 +1,53 @@
+<!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
+<idea-plugin>
+    <!-- Unique identifier of the plugin. It should be FQN. It cannot be changed between the plugin versions. -->
+    <id>kbtqa</id>
+
+    <!-- Public plugin name should be written in Title Case.
+         Guidelines: https://plugins.jetbrains.com/docs/marketplace/plugin-overview-page.html#plugin-name -->
+    <name>KBT QA Swiss Knife</name>
+
+    <!-- A displayed Vendor name or Organization ID displayed on the Plugins Page. -->
+    <vendor>Andrey Tyrin</vendor>
+
+    <!-- Description of the plugin displayed on the Plugin Page and IDE Plugin Manager.
+         Guidelines: https://plugins.jetbrains.com/docs/marketplace/plugin-overview-page.html#plugin-description -->
+    <description><![CDATA[
+    Various features to improve quality of your life.
+  ]]></description>
+
+    <!-- Product and plugin compatibility requirements.
+         Read more: https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html -->
+    <depends>com.intellij.modules.platform</depends>
+
+    <!-- Extension points defined by the plugin.
+         Read more: https://plugins.jetbrains.com/docs/intellij/plugin-extension-points.html -->
+    <extensions defaultExtensionNs="com.intellij">
+        <notificationGroup id="Stacktrace Copy" 
+                          displayType="BALLOON" 
+                          toolWindowId="Terminal"
+                          isLogByDefault="false"/>
+        <codeInsight.lineMarkerProvider
+                language="TEXT"
+                implementationClass="kbtqa.stacktraces.StacktraceLineMarkerProvider"/>
+    </extensions>
+    
+    <actions>
+        <action id="kbtqa.stacktraces.StacktraceCopyAction"
+                class="kbtqa.stacktraces.StacktraceCopyAction"
+                text="Copy Stacktrace"
+                description="Copy stacktrace to clipboard">
+<!--            <add-to-group group-id="ConsoleView.PopupMenu" anchor="first"/>-->
+            <add-to-group group-id="ConsoleEditorPopupMenu" anchor="first"/>
+            <add-to-group group-id="ToolWindowContextMenu" anchor="first"/>
+            <add-to-group group-id="BuildMenu" anchor="last"/>
+        </action>
+        <group id="kbtqa.helpers.QAHelpersActionGroup"
+                class="kbtqa.helpers.QAHelpersActionGroup"
+                text="QA Helpers"
+                description="Helper actions for QA tasks"
+                popup="true">
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+        </group>
+    </actions>
+</idea-plugin>
