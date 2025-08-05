@@ -15,12 +15,16 @@ class ConfigureRepositoriesAction : AnAction("Configure Repositories", "Insert r
 
     companion object {
         private const val COMMON_REPOSITORIES = """mavenCentral()
-        maven("https://packages.jetbrains.team/maven/p/kt/dev")
+        maven("https://redirector.kotlinlang.org/maven/dev")
+        maven("https://redirector.kotlinlang.org/maven/bootstrap")
+        maven("https://redirector.kotlinlang.org/maven/experimental")
         google()"""
 
         private const val PLUGIN_REPOSITORIES = """gradlePluginPortal()
         mavenCentral()
-        maven("https://packages.jetbrains.team/maven/p/kt/dev")
+        maven("https://redirector.kotlinlang.org/maven/dev")
+        maven("https://redirector.kotlinlang.org/maven/bootstrap")
+        maven("https://redirector.kotlinlang.org/maven/experimental")
         google()"""
 
         private val SETTINGS_GRADLE_REPOSITORIES = """
