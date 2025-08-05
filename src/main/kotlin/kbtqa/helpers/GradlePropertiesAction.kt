@@ -19,7 +19,7 @@ class GradlePropertiesAction : AnAction("Add Gradle Property", "Insert a Gradle 
             "kotlin.native.enableKlibsCrossCompilation=false",
             "kotlin.compiler.runViaBuildToolsApi=true",
             "kotlin.kmp.isolated-projects.support=enable",
-            "kotlin.internal.kmp.kmpPublicationStrategy=standardKMPPublication",
+            "kotlin.internal.kmp.kmpPublicationStrategy=uklibPublicationInASingleComponentWithKMPPublication",
             "kotlin.internal.kmp.kmpResolutionStrategy=interlibraryUklibAndPSMResolution_PreferUklibs",
             "kotlin.stdlib.default.dependency=false",
             "kotlin.mpp.enableCInteropCommonization=true",
@@ -47,34 +47,44 @@ class GradlePropertiesAction : AnAction("Add Gradle Property", "Insert a Gradle 
         val file = e.getData(CommonDataKeys.VIRTUAL_FILE) ?: return
         val editor = e.getData(CommonDataKeys.EDITOR) ?: return
         
-        // Create and show popup with property options
+        showPropertiesPopup(project, editor, e.dataContext)
+    }
+    
+    private fun showPropertiesPopup(project: Project, editor: Editor, dataContext: DataContext) {
+        // Create and show popup that recreates itself after each selection
         JBPopupFactory.getInstance()
             .createPopupChooserBuilder(PROPERTIES)
             .setTitle("Select Gradle Property")
             .setItemChosenCallback { property ->
                 insertProperty(project, editor, property)
+                // Recreate the popup after insertion to keep it open
+                showPropertiesPopup(project, editor, dataContext)
             }
             .createPopup()
-            .showInBestPositionFor(e.dataContext)
+            .showInBestPositionFor(dataContext)
     }
 
     private fun insertProperty(project: Project, editor: Editor, property: String) {
         val document = editor.document
         
-        // Insert the property at the end of the file with a newline if needed
+        // Insert the property at the cursor position
         WriteCommandAction.runWriteCommandAction(project) {
+            val insertPosition = editor.caretModel.offset
             val text = document.text
-            val insertPosition = document.textLength
             
-            // Add a newline before the property if the file doesn't end with one
-            val propertyToInsert = if (text.isEmpty() || text.endsWith("\n")) {
-                property
-            } else {
-                "\n$property"
+            // Check if we need to add newlines around the property
+            val needsNewlineBefore = insertPosition > 0 && !text.substring(insertPosition - 1, insertPosition).equals("\n")
+            val needsNewlineAfter = insertPosition < text.length && !text.substring(insertPosition, insertPosition + 1).equals("\n")
+            
+            // Build the property string with appropriate newlines
+            val propertyToInsert = buildString {
+                if (needsNewlineBefore) append("\n")
+                append(property)
+                if (needsNewlineAfter) append("\n")
             }
             
-            // Add a newline after the property
-            document.insertString(insertPosition, "$propertyToInsert\n")
+            // Insert the property at the cursor position
+            document.insertString(insertPosition, propertyToInsert)
         }
     }
 }
