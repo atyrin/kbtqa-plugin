@@ -1,7 +1,7 @@
 plugins {
     id("java")
-    id("org.jetbrains.kotlin.jvm") version "2.2.20-Beta1"
-    id("org.jetbrains.intellij.platform") version "2.6.0"
+    id("org.jetbrains.kotlin.jvm") version "2.2.20-Beta2"
+    id("org.jetbrains.intellij.platform") version "2.7.0"
 }
 
 version = "1.0-SNAPSHOT"
