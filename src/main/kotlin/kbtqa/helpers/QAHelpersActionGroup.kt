@@ -30,7 +30,8 @@ class QAHelpersActionGroup : ActionGroup("QA Helpers", "Helper actions for QA ta
             GradlePropertiesAction(),
             ConfigureRepositoriesAction(),
             AddDependencyAction(),
-            ConfigureBuildScanAction()
+            ConfigureBuildScanAction(),
+            ConfigureBuildCacheAction()
         )
     }
 }
