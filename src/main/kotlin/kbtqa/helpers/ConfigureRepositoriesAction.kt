@@ -1,218 +1,172 @@
 package kbtqa.helpers
 
 import com.intellij.openapi.actionSystem.*
-import com.intellij.openapi.editor.Editor
-import com.intellij.openapi.project.DumbAware
-import com.intellij.openapi.command.WriteCommandAction
-import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.project.Project
+import com.intellij.psi.util.PsiTreeUtil
+import org.jetbrains.kotlin.psi.*
 
 /**
  * Action that adds a context menu option for Gradle files
- * to insert repository configurations.
+ * to insert repository configurations using Kotlin PSI.
  */
-class ConfigureRepositoriesAction : AnAction("Configure Repositories", "Insert repository configurations", null), DumbAware {
-
+class ConfigureRepositoriesAction :
+    BaseSettingsGradleAction("Configure Repositories", "Insert repository configurations", null) {
     companion object {
         private const val COMMON_REPOSITORIES = """mavenCentral()
         maven("https://redirector.kotlinlang.org/maven/dev")
         maven("https://redirector.kotlinlang.org/maven/bootstrap")
         maven("https://redirector.kotlinlang.org/maven/experimental")
         google()"""
-
         private const val PLUGIN_REPOSITORIES = """gradlePluginPortal()
         mavenCentral()
         maven("https://redirector.kotlinlang.org/maven/dev")
         maven("https://redirector.kotlinlang.org/maven/bootstrap")
         maven("https://redirector.kotlinlang.org/maven/experimental")
         google()"""
-
-        private val SETTINGS_GRADLE_REPOSITORIES = """
-pluginManagement {
-    repositories {
-        $PLUGIN_REPOSITORIES
-    }
-}
-
-dependencyResolutionManagement {
-    repositories {
-        $COMMON_REPOSITORIES
-    }
-}
-
-""".trimIndent()
-
-        private val BUILD_GRADLE_REPOSITORIES = """
-repositories {
-    $COMMON_REPOSITORIES
-}
-
-""".trimIndent()
-    }
-
-    override fun getActionUpdateThread(): ActionUpdateThread {
-        return ActionUpdateThread.BGT
+        private const val PLUGIN_MANAGEMENT_BLOCK_NAME = "pluginManagement"
+        private const val DEPENDENCY_RESOLUTION_MANAGEMENT_BLOCK_NAME = "dependencyResolutionManagement"
+        private const val REPOSITORIES_BLOCK_NAME = "repositories"
+        private const val SETTINGS_GRADLE_KTS = "settings.gradle.kts"
+        private const val BUILD_GRADLE_KTS = "build.gradle.kts"
     }
 
     override fun update(e: AnActionEvent) {
         val file = e.getData(CommonDataKeys.VIRTUAL_FILE)
-        
         // Always show the action, but enable it only for settings.gradle.kts and build.gradle.kts files
         e.presentation.isVisible = true
-        e.presentation.isEnabled = file != null && 
-                (file.name == "settings.gradle.kts" || file.name == "build.gradle.kts")
+        e.presentation.isEnabled = file != null &&
+                (file.name == SETTINGS_GRADLE_KTS || file.name == BUILD_GRADLE_KTS)
     }
 
-    override fun actionPerformed(e: AnActionEvent) {
-        val project = e.project ?: return
-        val file = e.getData(CommonDataKeys.VIRTUAL_FILE) ?: return
-        val editor = e.getData(CommonDataKeys.EDITOR) ?: return
-        
-        // Determine which repositories block to insert based on the file name
-        val repositoriesBlock = when (file.name) {
-            "settings.gradle.kts" -> SETTINGS_GRADLE_REPOSITORIES
-            "build.gradle.kts" -> BUILD_GRADLE_REPOSITORIES
-            else -> return // This shouldn't happen due to the update method, but just in case
+    override fun performConfiguration(project: Project, ktFile: KtFile) {
+        val file = ktFile.virtualFile ?: return
+        when (file.name) {
+            SETTINGS_GRADLE_KTS -> configureSettingsGradleRepositories(project, ktFile)
+            BUILD_GRADLE_KTS -> configureBuildGradleRepositories(project, ktFile)
         }
-        
-        insertRepositories(project, editor, repositoriesBlock)
     }
 
-    private fun insertRepositories(project: Project, editor: Editor, repositoriesBlock: String) {
-        val document = editor.document
-        val file = FileDocumentManager.getInstance().getFile(document)
-        
-        WriteCommandAction.runWriteCommandAction(project) {
-            if (file?.name == "settings.gradle.kts") {
-                val text = document.text
-                
-                // Check for existing pluginManagement block
-                val pluginManagementExists = text.contains("pluginManagement\\s*\\{".toRegex())
-                // Check for existing dependencyResolutionManagement block
-                val dependencyManagementExists = text.contains("dependencyResolutionManagement\\s*\\{".toRegex())
-                
-                if (pluginManagementExists || dependencyManagementExists) {
-                    // If either block exists, we need to update them individually
-                    
-                    // Handle pluginManagement block
-                    if (pluginManagementExists) {
-                        val pluginManagementRegex = "pluginManagement\\s*\\{[^}]*\\}".toRegex(RegexOption.DOT_MATCHES_ALL)
-                        val pluginMatch = pluginManagementRegex.find(text)
-                        
-                        if (pluginMatch != null) {
-                            // Check if repositories block exists within pluginManagement
-                            val pluginBlock = pluginMatch.value
-                            val hasRepositories = pluginBlock.contains("repositories\\s*\\{".toRegex())
-                            
-                            if (hasRepositories) {
-                                // Replace existing repositories block
-                                val updatedPluginBlock = pluginBlock.replace(
-                                    "repositories\\s*\\{[^}]*\\}".toRegex(RegexOption.DOT_MATCHES_ALL),
-                                    """repositories {
-                                        |        $PLUGIN_REPOSITORIES
-                                        |    }""".trimMargin()
-                                )
-                                document.replaceString(pluginMatch.range.first, pluginMatch.range.last + 1, updatedPluginBlock)
-                            } else {
-                                // Add repositories block inside pluginManagement
-                                val insertPos = pluginMatch.range.first + "pluginManagement {".length
-                                document.insertString(insertPos, """
-                                    |
-                                    |    repositories {
-                                    |        $PLUGIN_REPOSITORIES
-                                    |    }""".trimMargin()
-                                )
-                            }
-                        }
-                    } else {
-                        // Add pluginManagement block at the beginning
-                        document.insertString(0, """pluginManagement {
-                            |
-                            |    repositories {
-                            |        $PLUGIN_REPOSITORIES
-                            |    }
-                            |}
-                            |
-                            |""".trimMargin()
-                        )
-                    }
-                    
-                    // Handle dependencyResolutionManagement block
-                    // We need to get the updated text after potential pluginManagement changes
-                    val updatedText = document.text
-                    if (dependencyManagementExists) {
-                        val dependencyManagementRegex = "dependencyResolutionManagement\\s*\\{[^}]*\\}".toRegex(RegexOption.DOT_MATCHES_ALL)
-                        val dependencyMatch = dependencyManagementRegex.find(updatedText)
-                        
-                        if (dependencyMatch != null) {
-                            // Check if repositories block exists within dependencyResolutionManagement
-                            val dependencyBlock = dependencyMatch.value
-                            val hasRepositories = dependencyBlock.contains("repositories\\s*\\{".toRegex())
-                            
-                            if (hasRepositories) {
-                                // Replace existing repositories block
-                                val updatedDependencyBlock = dependencyBlock.replace(
-                                    "repositories\\s*\\{[^}]*\\}".toRegex(RegexOption.DOT_MATCHES_ALL),
-                                    """repositories {
-                                        |        $COMMON_REPOSITORIES
-                                        |    }""".trimMargin()
-                                )
-                                document.replaceString(dependencyMatch.range.first, dependencyMatch.range.last + 1, updatedDependencyBlock)
-                            } else {
-                                // Add repositories block inside dependencyResolutionManagement
-                                val insertPos = dependencyMatch.range.first + "dependencyResolutionManagement {".length
-                                document.insertString(insertPos, """
-                                    |
-                                    |    repositories {
-                                    |        $COMMON_REPOSITORIES
-                                    |    }""".trimMargin()
-                                )
-                            }
-                        }
-                    } else {
-                        // Add dependencyResolutionManagement block after pluginManagement or at the beginning
-                        val pluginManagementEnd = updatedText.indexOf("pluginManagement {")
-                        val insertPos = if (pluginManagementEnd >= 0) {
-                            val endBrace = updatedText.indexOf("}", pluginManagementEnd)
-                            if (endBrace >= 0) endBrace + 1 else 0
-                        } else {
-                            0
-                        }
-                        
-                        document.insertString(insertPos, """
-                            |
-                            |dependencyResolutionManagement {
-                            |    repositories {
-                            |        $COMMON_REPOSITORIES
-                            |    }
-                            |}
-                            |
-                            |""".trimMargin()
-                        )
-                    }
+    private fun configureSettingsGradleRepositories(project: Project, ktFile: KtFile) {
+        executeWriteAction(project) {
+            val factory = KtPsiFactory(project)
+            // Configure pluginManagement block
+            configureRepositoriesInParentBlock(
+                ktFile, factory, PLUGIN_MANAGEMENT_BLOCK_NAME, PLUGIN_REPOSITORIES
+            ) { content ->
+                val newBlock = factory.createExpression(content)
+                val anchor = ktFile.firstChild
+                val addedBlock = if (anchor != null) {
+                    ktFile.addBefore(newBlock, anchor)
                 } else {
-                    // If neither block exists, insert both blocks at the beginning
-                    document.insertString(0, repositoriesBlock)
+                    ktFile.add(newBlock)
                 }
-            } else {
-                // For build.gradle.kts
-                val text = document.text
-                val repositoriesExists = text.contains("repositories\\s*\\{".toRegex())
-                
-                if (repositoriesExists) {
-                    // Replace existing repositories block
-                    val repositoriesRegex = "repositories\\s*\\{[^}]*\\}".toRegex(RegexOption.DOT_MATCHES_ALL)
-                    val match = repositoriesRegex.find(text)
-                    
-                    if (match != null) {
-                        document.replaceString(match.range.first, match.range.last + 1, """repositories {
-                            |    $COMMON_REPOSITORIES
-                            |}""".trimMargin()
-                        )
-                    }
+                ktFile.addAfter(factory.createNewLine(2), addedBlock)
+            }
+            // Configure dependencyResolutionManagement block
+            configureRepositoriesInParentBlock(
+                ktFile,
+                factory,
+                DEPENDENCY_RESOLUTION_MANAGEMENT_BLOCK_NAME,
+                COMMON_REPOSITORIES
+            ) { content ->
+                // Attempt to add after pluginManagement block for better formatting
+                val pluginManagementBlock = ktFile.findBlock(PLUGIN_MANAGEMENT_BLOCK_NAME)
+                if (pluginManagementBlock != null) {
+                    val newBlock = factory.createExpression(content)
+                    val addedBlock = pluginManagementBlock.parent.addAfter(newBlock, pluginManagementBlock)
+                    pluginManagementBlock.parent.addBefore(factory.createNewLine(2), addedBlock)
                 } else {
-                    // Insert at cursor position
-                    document.insertString(editor.caretModel.offset, repositoriesBlock)
+                    // Fallback to adding at the end of the file
+                    ktFile.addContentToFile(factory, content)
+                }
+            }
+        }
+    }
+
+    private fun configureBuildGradleRepositories(project: Project, ktFile: KtFile) {
+        executeWriteAction(project) {
+            val factory = KtPsiFactory(project)
+            val repositoriesBlock = ktFile.findBlock(REPOSITORIES_BLOCK_NAME)
+            if (repositoriesBlock != null) {
+                // Replace existing repositories block
+                replaceRepositoriesContent(repositoriesBlock, factory, COMMON_REPOSITORIES)
+            } else {
+                // Add new repositories block
+                val indentedRepos = COMMON_REPOSITORIES.prependIndent("    ")
+                val repositoriesConfig = """
+                |repositories {
+                |$indentedRepos
+                |}
+                """.trimMargin()
+                ktFile.addContentToFile(factory, repositoriesConfig)
+            }
+        }
+    }
+
+    private fun configureRepositoriesInParentBlock(
+        ktFile: KtFile,
+        factory: KtPsiFactory,
+        parentBlockName: String,
+        repositoriesContent: String,
+        addNewBlock: (String) -> Unit
+    ) {
+        val parentBlock = ktFile.findBlock(parentBlockName)
+        if (parentBlock != null) {
+            // Parent block exists, check for repositories block inside
+            val repositoriesBlock = findRepositoriesInBlock(parentBlock)
+            if (repositoriesBlock != null) {
+                replaceRepositoriesContent(repositoriesBlock, factory, repositoriesContent)
+            } else {
+                addRepositoriesToBlock(parentBlock, factory, repositoriesContent)
+            }
+        } else {
+            // Parent block does not exist, create it with repositories
+            val indentedRepos = repositoriesContent.prependIndent("        ")
+            val newBlockContent = """
+            |$parentBlockName {
+            |    repositories {
+            |$indentedRepos
+            |    }
+            |}
+            """.trimMargin()
+            addNewBlock(newBlockContent)
+        }
+    }
+
+    private fun findRepositoriesInBlock(parentBlock: KtCallExpression): KtCallExpression? {
+        val lambdaBody = parentBlock.lambdaArguments.firstOrNull()?.getLambdaExpression()?.bodyExpression
+        return lambdaBody?.let { body ->
+            PsiTreeUtil.findChildrenOfType(body, KtCallExpression::class.java)
+                .find { it.calleeExpression?.text == REPOSITORIES_BLOCK_NAME }
+        }
+    }
+
+    private fun addRepositoriesToBlock(parentBlock: KtCallExpression, factory: KtPsiFactory, repositories: String) {
+        val lambdaBody = parentBlock.lambdaArguments.firstOrNull()?.getLambdaExpression()?.bodyExpression
+        if (lambdaBody != null) {
+            val formattedRepositories = repositories.lines().joinToString("\n") { "    $it" }
+            val repositoriesBlock = factory.createExpression("repositories {\n$formattedRepositories\n}")
+            lambdaBody.addBefore(repositoriesBlock, lambdaBody.lastChild)
+            lambdaBody.addBefore(factory.createNewLine(), lambdaBody.lastChild)
+        }
+    }
+
+    private fun replaceRepositoriesContent(
+        repositoriesBlock: KtCallExpression,
+        factory: KtPsiFactory,
+        repositories: String
+    ) {
+        val lambdaBody = repositoriesBlock.lambdaArguments.firstOrNull()?.getLambdaExpression()?.bodyExpression
+        if (lambdaBody != null) {
+            // Clear existing content
+            lambdaBody.statements.forEach { it.delete() }
+            // Add new repositories
+            repositories.split("\n").forEach { repo ->
+                val trimmedRepo = repo.trim()
+                if (trimmedRepo.isNotEmpty()) {
+                    val repoExpression = factory.createExpression(trimmedRepo)
+                    lambdaBody.addBefore(repoExpression, lambdaBody.lastChild)
+                    lambdaBody.addBefore(factory.createNewLine(), lambdaBody.lastChild)
                 }
             }
         }
