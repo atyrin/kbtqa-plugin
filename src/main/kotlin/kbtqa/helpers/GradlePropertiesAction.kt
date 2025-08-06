@@ -66,25 +66,24 @@ class GradlePropertiesAction : AnAction("Add Gradle Property", "Insert a Gradle 
 
     private fun insertProperty(project: Project, editor: Editor, property: String) {
         val document = editor.document
-        
-        // Insert the property at the cursor position
         WriteCommandAction.runWriteCommandAction(project) {
-            val insertPosition = editor.caretModel.offset
-            val text = document.text
-            
-            // Check if we need to add newlines around the property
-            val needsNewlineBefore = insertPosition > 0 && !text.substring(insertPosition - 1, insertPosition).equals("\n")
-            val needsNewlineAfter = insertPosition < text.length && !text.substring(insertPosition, insertPosition + 1).equals("\n")
-            
-            // Build the property string with appropriate newlines
-            val propertyToInsert = buildString {
-                if (needsNewlineBefore) append("\n")
-                append(property)
-                if (needsNewlineAfter) append("\n")
+            val caretModel = editor.caretModel
+            val offset = caretModel.offset
+            val lineNumber = document.getLineNumber(offset)
+            val lineStartOffset = document.getLineStartOffset(lineNumber)
+            val lineEndOffset = document.getLineEndOffset(lineNumber)
+            val lineText = document.charsSequence.subSequence(lineStartOffset, lineEndOffset).toString()
+
+            if (lineText.isNotBlank()) {
+                // Line is not blank, insert property on the next line
+                val propertyToInsert = "\n" + property
+                document.insertString(lineEndOffset, propertyToInsert)
+                caretModel.moveToOffset(lineEndOffset + propertyToInsert.length)
+            } else {
+                // Line is blank, insert property at the current caret position
+                document.insertString(offset, property)
+                caretModel.moveToOffset(offset + property.length)
             }
-            
-            // Insert the property at the cursor position
-            document.insertString(insertPosition, propertyToInsert)
         }
     }
 }
