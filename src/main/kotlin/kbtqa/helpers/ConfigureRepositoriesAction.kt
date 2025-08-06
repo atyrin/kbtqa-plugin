@@ -88,8 +88,8 @@ class ConfigureRepositoriesAction :
             val factory = KtPsiFactory(project)
             val repositoriesBlock = ktFile.findBlock(REPOSITORIES_BLOCK_NAME)
             if (repositoriesBlock != null) {
-                // Replace existing repositories block
-                replaceRepositoriesContent(repositoriesBlock, factory, COMMON_REPOSITORIES)
+                // Update existing repositories block
+                updateRepositoriesContent(repositoriesBlock, factory, COMMON_REPOSITORIES)
             } else {
                 // Add new repositories block
                 val indentedRepos = COMMON_REPOSITORIES.prependIndent("    ")
@@ -115,7 +115,7 @@ class ConfigureRepositoriesAction :
             // Parent block exists, check for repositories block inside
             val repositoriesBlock = findRepositoriesInBlock(parentBlock)
             if (repositoriesBlock != null) {
-                replaceRepositoriesContent(repositoriesBlock, factory, repositoriesContent)
+                updateRepositoriesContent(repositoriesBlock, factory, repositoriesContent)
             } else {
                 addRepositoriesToBlock(parentBlock, factory, repositoriesContent)
             }
@@ -151,24 +151,51 @@ class ConfigureRepositoriesAction :
         }
     }
 
-    private fun replaceRepositoriesContent(
+    private fun updateRepositoriesContent(
         repositoriesBlock: KtCallExpression,
         factory: KtPsiFactory,
         repositories: String
     ) {
-        val lambdaBody = repositoriesBlock.lambdaArguments.firstOrNull()?.getLambdaExpression()?.bodyExpression
-        if (lambdaBody != null) {
-            // Clear existing content
-            lambdaBody.statements.forEach { it.delete() }
-            // Add new repositories
-            repositories.split("\n").forEach { repo ->
-                val trimmedRepo = repo.trim()
-                if (trimmedRepo.isNotEmpty()) {
-                    val repoExpression = factory.createExpression(trimmedRepo)
-                    lambdaBody.addBefore(repoExpression, lambdaBody.lastChild)
-                    lambdaBody.addBefore(factory.createNewLine(), lambdaBody.lastChild)
+        val lambdaBody = repositoriesBlock.lambdaArguments.firstOrNull()?.getLambdaExpression()?.bodyExpression ?: return
+
+        val existingRepositories = lambdaBody.statements
+        val existingMavenUrls = existingRepositories.mapNotNull { getMavenUrl(it) }.map { it.removeSuffix("/") }.toSet()
+        val existingOtherRepoTexts = existingRepositories.filter { getMavenUrl(it) == null }.map { it.text }.toSet()
+
+        val repositoriesToAdd = repositories.lines().map(String::trim).filter(String::isNotEmpty)
+
+        for (repoString in repositoriesToAdd) {
+            val newRepoExpression = factory.createExpression(repoString)
+            val mavenUrl = getMavenUrl(newRepoExpression)
+
+            val shouldAdd = if (mavenUrl != null) {
+                mavenUrl.removeSuffix("/") !in existingMavenUrls
+            } else {
+                newRepoExpression.text !in existingOtherRepoTexts
+            }
+
+            if (shouldAdd) {
+                val anchor = lambdaBody.lastChild
+                if (anchor != null) {
+                    val addedRepo = lambdaBody.addBefore(newRepoExpression, anchor)
+                    lambdaBody.addAfter(factory.createNewLine(), addedRepo)
                 }
             }
         }
+    }
+
+    private fun getMavenUrl(expression: KtExpression): String? {
+        if (expression !is KtCallExpression) return null
+        if (expression.calleeExpression?.text != "maven") return null
+
+        val argument = expression.valueArguments.firstOrNull()?.getArgumentExpression() as? KtStringTemplateExpression
+            ?: return null
+
+        // It's a string literal like "https://...", without any variables.
+        if (argument.entries.size == 1 && argument.entries[0] is KtLiteralStringTemplateEntry) {
+            return argument.entries[0].text
+        }
+
+        return null
     }
 }
