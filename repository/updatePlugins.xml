@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<plugins>
+    <plugin
+            id="kbtqa"
+            url="https://github.com/atyrin/kbtqa-plugin/releases/download/1.0.1/kbtqa-1.0.1.zip"
+            version="1.0.1">
+        <idea-version since-build="251"/>
+    </plugin>
+</plugins>
