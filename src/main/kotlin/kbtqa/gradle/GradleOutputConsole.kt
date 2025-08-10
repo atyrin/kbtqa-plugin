@@ -34,14 +34,6 @@ class GradleOutputConsole(private val project: Project) {
         consoleView.print("=".repeat(50) + "\n", ConsoleViewContentType.SYSTEM_OUTPUT)
 
         processHandler.addProcessListener(object : ProcessAdapter() {
-            override fun onTextAvailable(event: ProcessEvent, outputType: Key<*>) {
-                val contentType = when (outputType) {
-                    com.intellij.execution.process.ProcessOutputTypes.STDERR -> ConsoleViewContentType.ERROR_OUTPUT
-                    else -> ConsoleViewContentType.NORMAL_OUTPUT
-                }
-                consoleView.print(event.text, contentType)
-            }
-
             override fun processTerminated(event: ProcessEvent) {
                 consoleView.print("\n" + "=".repeat(50) + "\n", ConsoleViewContentType.SYSTEM_OUTPUT)
                 consoleView.print("Command finished with exit code: ${event.exitCode}\n", ConsoleViewContentType.SYSTEM_OUTPUT)
