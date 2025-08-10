@@ -43,7 +43,7 @@ class GradleCommandService(private val project: Project) {
      * Lists all configurations for a project.
      */
     fun listConfigurations(projectPath: String = ""): ProcessHandler? {
-        return executeGradleCommand(projectPath, "configurations", listOf("--console=plain"))
+        return executeGradleCommand(projectPath, "resolvableConfigurations", listOf("--console=plain"))
     }
 
     /**
