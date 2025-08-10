@@ -25,7 +25,7 @@ class GradleDebugPanel(private val project: Project) : JPanel(BorderLayout()) {
     private val tree: JTree
     private val treeModel: DefaultTreeModel
     private val gradleCommandService = project.service<GradleCommandService>()
-    private val outputConsole: GradleOutputConsole
+    private val consoleManager: GradleConsoleManager
 
     init {
         // Create the tree model with root node
@@ -33,14 +33,14 @@ class GradleDebugPanel(private val project: Project) : JPanel(BorderLayout()) {
         treeModel = DefaultTreeModel(rootNode)
         tree = Tree(treeModel)
 
-        // Create output console
-        outputConsole = GradleOutputConsole(project)
+        // Create console manager
+        consoleManager = GradleConsoleManager(project)
 
-        // Create splitter with tree on left and console on right
+        // Create splitter with tree on left and console manager on right
         val splitter = JBSplitter(false, 0.3f)
         val treeScrollPane = JBScrollPane(tree)
         splitter.firstComponent = treeScrollPane
-        splitter.secondComponent = outputConsole.component
+        splitter.secondComponent = consoleManager.component
 
         add(splitter, BorderLayout.CENTER)
 
@@ -117,20 +117,20 @@ class GradleDebugPanel(private val project: Project) : JPanel(BorderLayout()) {
         when (nodeText) {
             "List Configurations" -> {
                 val processHandler = gradleCommandService.listConfigurations(projectPath)
-                outputConsole.executeAndDisplay(processHandler, "gradle $projectPath:configurations")
+                consoleManager.executeAndDisplay(projectPath, "configurations", processHandler, "gradle $projectPath:configurations")
             }
             "List Dependencies" -> {
                 val processHandler = gradleCommandService.listDependencies(projectPath)
-                outputConsole.executeAndDisplay(processHandler, "gradle $projectPath:dependencies")
+                consoleManager.executeAndDisplay(projectPath, "dependencies", processHandler, "gradle $projectPath:dependencies")
             }
             "Dependency Insights" -> {
                 // For now, show insights for a common dependency - could be enhanced with user input
                 val processHandler = gradleCommandService.dependencyInsight(projectPath, "kotlin-stdlib")
-                outputConsole.executeAndDisplay(processHandler, "gradle $projectPath:dependencyInsight --dependency kotlin-stdlib")
+                consoleManager.executeAndDisplay(projectPath, "dependencyInsight", processHandler, "gradle $projectPath:dependencyInsight --dependency kotlin-stdlib")
             }
             "Outgoing Variants" -> {
                 val processHandler = gradleCommandService.outgoingVariants(projectPath)
-                outputConsole.executeAndDisplay(processHandler, "gradle $projectPath:outgoingVariants")
+                consoleManager.executeAndDisplay(projectPath, "outgoingVariants", processHandler, "gradle $projectPath:outgoingVariants")
             }
         }
     }
