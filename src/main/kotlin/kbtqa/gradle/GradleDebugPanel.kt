@@ -81,20 +81,11 @@ class GradleDebugPanel(private val project: Project) : JPanel(BorderLayout()) {
         // Discover actual subprojects by executing gradle projects command and parsing output
         val actualSubprojects = gradleCommandService.discoverActualSubprojects()
         
-        if (actualSubprojects.isNotEmpty()) {
-            val subprojectsNode = DefaultMutableTreeNode("Subprojects")
-            rootNode.add(subprojectsNode)
-            
-            // Add discovered subprojects
-            actualSubprojects.forEach { subprojectName ->
-                val subprojectNode = DefaultMutableTreeNode("Project: $subprojectName")
-                subprojectsNode.add(subprojectNode)
-                addCommandNodes(subprojectNode)
-            }
-        } else {
-            // Fallback: add a placeholder indicating no subprojects found or discovery failed
-            val subprojectsNode = DefaultMutableTreeNode("Subprojects (none found or discovery failed)")
-            rootNode.add(subprojectsNode)
+        // Add discovered subprojects directly to the root node at the same level as root project
+        actualSubprojects.forEach { subprojectName ->
+            val subprojectNode = DefaultMutableTreeNode("Project: $subprojectName")
+            rootNode.add(subprojectNode)
+            addCommandNodes(subprojectNode)
         }
     }
     
