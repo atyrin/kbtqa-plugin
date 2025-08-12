@@ -4,6 +4,7 @@
 * configure build cache
 * configure maven repositories
 * configure build scan
+* configure version catalog
 
 # Usage
 

@@ -31,7 +31,8 @@ class QAHelpersActionGroup : ActionGroup("QA Helpers", "Helper actions for QA ta
             ConfigureRepositoriesAction(),
             AddDependencyAction(),
             ConfigureBuildScanAction(),
-            ConfigureBuildCacheAction()
+            ConfigureBuildCacheAction(),
+            OverwriteVersionCatalogAction()
         )
     }
 }

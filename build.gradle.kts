@@ -4,7 +4,7 @@ plugins {
     id("org.jetbrains.intellij.platform") version "2.7.0"
 }
 
-version = "1.0.1"
+version = "1.1.0"
 
 repositories {
     mavenCentral()
@@ -33,7 +33,7 @@ intellijPlatform {
         }
 
         changeNotes = """
-      Initial version
+      Add version catalog configuration (1.1.0)
     """.trimIndent()
     }
 }
