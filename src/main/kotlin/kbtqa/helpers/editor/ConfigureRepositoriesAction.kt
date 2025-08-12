@@ -1,4 +1,4 @@
-package kbtqa.helpers
+package kbtqa.helpers.editor
 
 import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.project.Project

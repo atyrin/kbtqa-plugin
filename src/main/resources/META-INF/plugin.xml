@@ -47,14 +47,14 @@
             <add-to-group group-id="ToolWindowContextMenu" anchor="first"/>
             <add-to-group group-id="BuildMenu" anchor="last"/>
         </action>
-        <action id="kbtqa.helpers.ConfigureVersionCatalogAction"
-                class="kbtqa.helpers.ConfigureVersionCatalogAction"
+        <action id="kbtqa.helpers.projectview.ConfigureVersionCatalogAction"
+                class="kbtqa.helpers.projectview.ConfigureVersionCatalogAction"
                 text="Configure Version Catalog"
                 description="Create or validate libs.versions.toml file">
             <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
         </action>
-        <group id="kbtqa.helpers.QAHelpersActionGroup"
-                class="kbtqa.helpers.QAHelpersActionGroup"
+        <group id="kbtqa.helpers.editor.QAHelpersActionGroup"
+                class="kbtqa.helpers.editor.QAHelpersActionGroup"
                 text="QA Helpers"
                 description="Helper actions for QA tasks"
                 popup="true">

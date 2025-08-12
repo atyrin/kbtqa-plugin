@@ -1,4 +1,4 @@
-package kbtqa.helpers
+package kbtqa.helpers.editor
 
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.fileEditor.FileDocumentManager

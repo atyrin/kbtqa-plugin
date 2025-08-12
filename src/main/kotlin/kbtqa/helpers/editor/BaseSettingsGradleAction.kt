@@ -1,4 +1,4 @@
-package kbtqa.helpers
+package kbtqa.helpers.editor
 
 import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.command.WriteCommandAction
@@ -6,6 +6,7 @@ import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
 import com.intellij.psi.util.PsiTreeUtil
 import org.jetbrains.kotlin.psi.*
+import javax.swing.Icon
 
 /**
  * Abstract base class for actions that operate on settings.gradle.kts files.
@@ -14,7 +15,7 @@ import org.jetbrains.kotlin.psi.*
 abstract class BaseSettingsGradleAction(
     text: String,
     description: String,
-    icon: javax.swing.Icon? = null
+    icon: Icon? = null
 ) : AnAction(text, description, icon), DumbAware {
 
     override fun getActionUpdateThread(): ActionUpdateThread {

@@ -1,6 +1,5 @@
-package kbtqa.helpers
+package kbtqa.helpers.editor
 
-import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.project.Project
 import com.intellij.psi.util.PsiTreeUtil
 import org.jetbrains.kotlin.psi.*
