@@ -28,6 +28,9 @@
                           displayType="BALLOON" 
                           toolWindowId="Terminal"
                           isLogByDefault="false"/>
+        <notificationGroup id="Kotlin Versions" 
+                          displayType="BALLOON" 
+                          isLogByDefault="false"/>
         <codeInsight.lineMarkerProvider
                 language="TEXT"
                 implementationClass="kbtqa.stacktraces.StacktraceLineMarkerProvider"/>
@@ -46,6 +49,12 @@
             <add-to-group group-id="ConsoleEditorPopupMenu" anchor="first"/>
             <add-to-group group-id="ToolWindowContextMenu" anchor="first"/>
             <add-to-group group-id="BuildMenu" anchor="last"/>
+        </action>
+        <action id="kbtqa.helpers.versions.KotlinVersionsAction"
+                class="kbtqa.helpers.versions.KotlinVersionsAction"
+                text="Show Kotlin Versions"
+                description="Display available Kotlin versions from different channels (Stable, Dev, Experimental)">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
         </action>
         <action id="kbtqa.helpers.projectview.ConfigureVersionCatalogAction"
                 class="kbtqa.helpers.projectview.ConfigureVersionCatalogAction"

@@ -31,7 +31,7 @@ intellijPlatform {
         }
 
         changeNotes = """
-      Add version catalog configuration (1.1.0)
+      Add Kotlin versions discovery (1.2.0)
     """.trimIndent()
     }
 }
