@@ -27,9 +27,12 @@ class QAHelpersActionGroup : ActionGroup("QA Helpers", "Helper actions for QA ta
 
     override fun getChildren(e: AnActionEvent?): Array<AnAction> {
         return arrayOf(
-            GradlePropertiesAction(),
             ConfigureRepositoriesAction(),
+            Separator.create("Gradle Properties"),
+            GradlePropertiesAction(),
+            Separator.create("Build Script"),
             AddDependencyAction(),
+            Separator.create("Settings"),
             ConfigureBuildScanAction(),
             ConfigureBuildCacheAction(),
             OverwriteVersionCatalogAction()
