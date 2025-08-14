@@ -1,10 +1,8 @@
 plugins {
     id("java")
     id("org.jetbrains.kotlin.jvm") version "2.2.20-Beta2"
-    id("org.jetbrains.intellij.platform") version "2.7.0"
+    id("org.jetbrains.intellij.platform") version "2.7.2"
 }
-
-version = "1.1.0"
 
 repositories {
     mavenCentral()
