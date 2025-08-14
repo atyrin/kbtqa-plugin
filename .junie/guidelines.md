@@ -47,11 +47,6 @@ kbtqa-plugin/
 ./gradlew build
 ```
 
-### Running Tests
-```bash
-./gradlew test
-```
-
 ### Running the Plugin in Development
 ```bash
 ./gradlew runIde
@@ -71,7 +66,6 @@ kbtqa-plugin/
 - Keep functions focused and single-purpose
 
 ### Testing Strategy
-- Run tests after making changes to ensure no regressions
 - Test plugin functionality in a development IDE instance using `runIde`
 - Verify actions work correctly with different Gradle file types (build.gradle.kts, settings.gradle.kts, gradle.properties)
 
@@ -89,7 +83,6 @@ kbtqa-plugin/
 ## Junie Instructions
 
 ### Testing Requirements
-- **Always run tests** after making code changes using `./gradlew test`
 - **Test in development IDE** using `./gradlew runIde` to verify plugin functionality
 - **Verify action availability** in appropriate contexts (editor menus, console menus, etc.)
 
