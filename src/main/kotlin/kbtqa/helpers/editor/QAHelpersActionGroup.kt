@@ -13,16 +13,16 @@ class QAHelpersActionGroup : ActionGroup("QA Helpers", "Helper actions for QA ta
     }
 
     override fun update(e: AnActionEvent) {
-        // Always show the action group, regardless of file type
-        e.presentation.isVisible = true
-        
         val file = e.getData(CommonDataKeys.VIRTUAL_FILE)
         
-        // Enable the action group only for gradle.properties, settings.gradle.kts, and build.gradle.kts files
-        e.presentation.isEnabled = file != null && 
+        // Show and enable the action group only for gradle.properties, settings.gradle.kts, and build.gradle.kts files
+        val isSupported = file != null && 
                 (file.name == "gradle.properties" || 
                  file.name == "settings.gradle.kts" || 
                  file.name == "build.gradle.kts")
+        
+        e.presentation.isVisible = isSupported
+        e.presentation.isEnabled = isSupported
     }
 
     override fun getChildren(e: AnActionEvent?): Array<AnAction> {
