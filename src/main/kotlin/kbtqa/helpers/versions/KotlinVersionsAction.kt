@@ -18,7 +18,7 @@ import kotlinx.coroutines.*
  * This action is available via IDE search and can be invoked from anywhere.
  */
 class KotlinVersionsAction : AnAction(
-    "Show Kotlin Versions",
+    "Show Kotlin Versions (KGP)", // refer KGP for easy search with Shift + Shift
     "Display available Kotlin versions from different channels (Stable, Dev, Experimental)",
     null
 ), DumbAware {

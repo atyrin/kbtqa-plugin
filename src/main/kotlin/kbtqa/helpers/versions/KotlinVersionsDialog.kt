@@ -35,6 +35,15 @@ class KotlinVersionsDialog(
     
     private val logger = thisLogger()
     
+    companion object {
+        private val REPOSITORY_URLS = mapOf(
+            "Dev" to "https://redirector.kotlinlang.org/maven/dev",
+            "Experimental" to "https://redirector.kotlinlang.org/maven/experimental"
+        )
+        
+        private val MULTI_COLUMN_CHANNELS = setOf("Dev", "Experimental")
+    }
+    
     init {
         title = "Kotlin Versions"
         init()
@@ -69,10 +78,28 @@ class KotlinVersionsDialog(
     private fun createChannelPanel(channel: KotlinVersionsService.VersionChannel): JComponent {
         val panel = JPanel(BorderLayout())
         
+        // Create the top panel with description and repository copy button for Dev/Experimental
+        val topPanel = JPanel(BorderLayout())
+        
         // Add channel description
         val descriptionLabel = JBLabel("<html><b>${channel.description}</b></html>")
-        descriptionLabel.border = JBUI.Borders.empty(0, 0, 10, 0)
-        panel.add(descriptionLabel, BorderLayout.NORTH)
+        descriptionLabel.border = JBUI.Borders.emptyBottom(10)
+        topPanel.add(descriptionLabel, BorderLayout.WEST)
+        
+        // Add repository copy button for Dev and Experimental channels
+        REPOSITORY_URLS[channel.name]?.let { repositoryUrl ->
+            val copyRepoButton = JButton("Copy Repository URL")
+            copyRepoButton.addActionListener {
+                copyVersionToClipboard(repositoryUrl, "Repository URL")
+            }
+            
+            // Create a panel with proper margins for the button to maintain button appearance
+            val buttonPanel = JPanel(FlowLayout(FlowLayout.RIGHT, 10, 0))
+            buttonPanel.add(copyRepoButton)
+            topPanel.add(buttonPanel, BorderLayout.EAST)
+        }
+        
+        panel.add(topPanel, BorderLayout.NORTH)
         
         if (channel.versions.isEmpty()) {
             panel.add(JBLabel("No versions available for this channel."), BorderLayout.CENTER)
@@ -80,7 +107,7 @@ class KotlinVersionsDialog(
         }
         
         // Use column layout for Dev and Experimental tabs, single list for Stable
-        val centerPanel = if (channel.name == "Dev" || channel.name == "Experimental") {
+        val centerPanel = if (isMultiColumnChannel(channel.name)) {
             createColumnsPanel(channel.versions)
         } else {
             createSingleListPanel(channel.versions)
@@ -94,54 +121,50 @@ class KotlinVersionsDialog(
      * Creates a single list panel (used for Stable channel)
      */
     private fun createSingleListPanel(versions: List<String>): JComponent {
-        val safeVersions = versions.map { it.toString() }
-        val versionList = JBList(CollectionListModel(safeVersions))
-        versionList.selectionMode = ListSelectionModel.SINGLE_SELECTION
-        versionList.cellRenderer = SimpleListCellRenderer.create<String> { label, value, _ ->
-            label.text = value
-        }
-        
-        addListInteractionListeners(versionList)
+        val versionList = createVersionList(versions)
         return JBScrollPane(versionList)
     }
-    
+
     /**
      * Creates a columns panel grouped by major version (used for Dev and Experimental channels)
      */
     private fun createColumnsPanel(versions: List<String>): JComponent {
         val groupedVersions = groupVersionsByMajor(versions)
-        
+
         if (groupedVersions.isEmpty()) {
             return JBLabel("No versions available for this channel.")
         }
-        
+
         val columnsPanel = JPanel(GridLayout(1, groupedVersions.size, 10, 0))
-        
+
         for ((majorVersion, versionList) in groupedVersions) {
             val columnPanel = JPanel(BorderLayout())
-            
+
             // Add header for the column
             val headerLabel = JBLabel("<html><b>Version ${majorVersion}.x</b></html>")
-            headerLabel.border = JBUI.Borders.empty(0, 0, 5, 0)
+            headerLabel.border = JBUI.Borders.emptyBottom(5)
             columnPanel.add(headerLabel, BorderLayout.NORTH)
-            
+
             // Create list for this major version group
-            val safeVersions = versionList.map { it.toString() }
-            val versionJBList = JBList(CollectionListModel(safeVersions))
-            versionJBList.selectionMode = ListSelectionModel.SINGLE_SELECTION
-            versionJBList.cellRenderer = SimpleListCellRenderer.create<String> { label, value, _ ->
-                label.text = value
-            }
-            
-            addListInteractionListeners(versionJBList)
-            
+            val versionJBList = createVersionList(versionList)
+
             val scrollPane = JBScrollPane(versionJBList)
             columnPanel.add(scrollPane, BorderLayout.CENTER)
-            
+
             columnsPanel.add(columnPanel)
         }
-        
+
         return columnsPanel
+    }
+
+    private fun createVersionList(versions: List<String>): JBList<String> {
+        val versionList = JBList(CollectionListModel(versions))
+        versionList.selectionMode = ListSelectionModel.SINGLE_SELECTION
+        versionList.cellRenderer = SimpleListCellRenderer.create<String> { label, value, _ ->
+            label.text = value
+        }
+        addListInteractionListeners(versionList)
+        return versionList
     }
     
     /**
@@ -153,8 +176,7 @@ class KotlinVersionsDialog(
             override fun mouseClicked(e: MouseEvent) {
                 if (e.clickCount == 2) {
                     versionList.selectedValue?.let { version ->
-                        copyToClipboard(version)
-                        showCopiedNotification(version)
+                        copyVersionToClipboard(version)
                     }
                 }
             }
@@ -165,12 +187,18 @@ class KotlinVersionsDialog(
             override fun keyPressed(e: KeyEvent) {
                 if (e.keyCode == KeyEvent.VK_ENTER) {
                     versionList.selectedValue?.let { version ->
-                        copyToClipboard(version)
-                        showCopiedNotification(version)
+                        copyVersionToClipboard(version)
                     }
                 }
             }
         })
+    }
+    
+    /**
+     * Checks if a channel should use multi-column layout
+     */
+    private fun isMultiColumnChannel(channelName: String): Boolean {
+        return channelName in MULTI_COLUMN_CHANNELS
     }
     
     /**
@@ -194,64 +222,43 @@ class KotlinVersionsDialog(
         return versions
             .groupBy { extractMajorVersion(it) }
             .toSortedMap { v1, v2 ->
-                // Sort major versions in descending order (newest first)
-                compareVersions(v2, v1)
+                // Simple major version comparison - compare as version strings
+                val parts1 = v1.split(".").map { it.toIntOrNull() ?: 0 }
+                val parts2 = v2.split(".").map { it.toIntOrNull() ?: 0 }
+                
+                // Compare major version (first part), then minor (second part)
+                val majorComparison = (parts2.getOrElse(0) { 0 }).compareTo(parts1.getOrElse(0) { 0 })
+                if (majorComparison != 0) {
+                    majorComparison
+                } else {
+                    (parts2.getOrElse(1) { 0 }).compareTo(parts1.getOrElse(1) { 0 })
+                }
             }
     }
     
     /**
-     * Compares two version strings for sorting.
-     * Returns positive if v1 > v2, negative if v1 < v2, 0 if equal.
+     * Copies text to clipboard and shows a notification.
+     * @param text The text to copy
+     * @param itemType The type of item being copied (e.g., "Version", "Repository URL")
      */
-    private fun compareVersions(v1: String, v2: String): Int {
-        val parts1 = v1.split(".", "-")
-        val parts2 = v2.split(".", "-")
-        
-        val maxLength = maxOf(parts1.size, parts2.size)
-        
-        for (i in 0 until maxLength) {
-            val part1 = parts1.getOrNull(i) ?: ""
-            val part2 = parts2.getOrNull(i) ?: ""
-            
-            // Try to compare as numbers first
-            val num1 = part1.toIntOrNull()
-            val num2 = part2.toIntOrNull()
-            
-            val comparison = when {
-                num1 != null && num2 != null -> num1.compareTo(num2)
-                num1 != null && num2 == null -> 1 // Numbers come after text
-                num1 == null && num2 != null -> -1 // Text comes before numbers
-                else -> part1.compareTo(part2, ignoreCase = true)
-            }
-            
-            if (comparison != 0) {
-                return comparison
-            }
-        }
-        
-        return 0
-    }
-    
-    private fun copyToClipboard(version: String) {
+    private fun copyVersionToClipboard(text: String, itemType: String = "Version") {
         try {
-            val selection = StringSelection(version)
+            val selection = StringSelection(text)
             val clipboard = Toolkit.getDefaultToolkit().systemClipboard
             clipboard.setContents(selection, null)
-            logger.info("Copied Kotlin version to clipboard: $version")
+            logger.info("Copied $itemType to clipboard: $text")
+            
+            NotificationGroupManager.getInstance()
+                .getNotificationGroup("Kotlin Versions")
+                .createNotification("$itemType '$text' has been copied to clipboard", NotificationType.INFORMATION)
+                .notify(project)
         } catch (e: Exception) {
-            logger.warn("Failed to copy version to clipboard", e)
+            logger.warn("Failed to copy $itemType to clipboard", e)
             Messages.showErrorDialog(
-                "Failed to copy version to clipboard: ${e.message}",
+                "Failed to copy $itemType to clipboard: ${e.message}",
                 "Copy Error"
             )
         }
-    }
-    
-    private fun showCopiedNotification(version: String) {
-        NotificationGroupManager.getInstance()
-            .getNotificationGroup("Kotlin Versions")
-            .createNotification("Version '$version' has been copied to clipboard", NotificationType.INFORMATION)
-            .notify(project)
     }
     
     override fun createActions(): Array<Action> {
