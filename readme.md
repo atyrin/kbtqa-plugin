@@ -1,15 +1,27 @@
 # Features
 
-* add properties from catalog
-* configure build cache
-* configure maven repositories
-* configure build scan
-* configure version catalog
-* shows the latest kotlin versions
+## Context menu action
 
-# Usage
+Action available under _QA Helpers_ menu. 
+The options depend on the file where the context menu is opened.
 
-Action _QA Helpers_ available in the context menu of `build.gradle.kts`, `settings.gradle.kts` and `gradle.properties` files.
+For `gradle.properties`:
+* a list with well-known properties.
+For `build.gradle.kts`:
+* _Configure maven repositories_ will add a repositories section with popular maven repositories.
+* _Add dependency_ will suggest a list of KMP dependencies (GAV coordinates)
+For `settings.gradle.kts`:
+* _Configure build scan_ will set up Gradle build cache—add plugin and a simple configuration.
+* _Configure build cache_ will add a simple build cache configuration.
+
+For `gradle` directory in the file tree:
+* _Configure version catalog_ will create a file `libs.versions.toml` with a sample catalog.
+
+## General actions
+
+### Shows the latest kotlin versions
+An action available in the `Tools` menu. It will show all available kotlin versions from stable/dev and experimantal channels.
+
 
 # Updates
 

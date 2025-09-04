@@ -24,6 +24,7 @@ dependencies {
     }
 }
 
+
 intellijPlatform {
     pluginConfiguration {
         ideaVersion {
@@ -33,6 +34,7 @@ intellijPlatform {
         changeNotes = """
       Add Kotlin versions discovery (1.2.0)
     """.trimIndent()
+        description = project.file("src/main/resources/description.html").readText()
     }
 }
 
