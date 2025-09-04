@@ -26,7 +26,7 @@ abstract class BaseVersionsService : VersionsService {
      */
     protected suspend fun getVersionsFromUrl(url: String): List<String> {
         return try {
-            logger.info("Fetching versions from: $url")
+            logger.warn("Fetching versions from: $url")
 
             val client = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(REQUEST_TIMEOUT_SECONDS))

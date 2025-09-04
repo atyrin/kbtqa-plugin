@@ -23,6 +23,11 @@ import java.awt.event.KeyAdapter
 import java.awt.event.KeyEvent
 import javax.swing.event.DocumentEvent
 import javax.swing.event.DocumentListener
+import com.intellij.openapi.progress.ProgressIndicator
+import com.intellij.openapi.progress.ProgressManager
+import com.intellij.openapi.progress.Task
+import com.intellij.openapi.application.ApplicationManager
+import kotlinx.coroutines.*
 
 /**
  * Dialog that displays available versions for different tools.
@@ -41,6 +46,11 @@ class ToolVersionsDialog(
     private var currentTool: ToolVersionsManager.Tool? = null
     private var searchField: SearchTextField? = null
     private var currentFilter: String = ""
+    
+    // Track loaded tools and loading states
+    private val loadedTools = mutableMapOf<String, ToolVersionsManager.Tool>()
+    private val loadingStates = mutableMapOf<String, Boolean>()
+    private val toolsManager = ToolVersionsManager.getInstance()
 
     init {
         title = "Tool Versions"
@@ -73,6 +83,26 @@ class ToolVersionsDialog(
         mainPanel.add(instructionsLabel, BorderLayout.SOUTH)
         
         mainPanel.preferredSize = Dimension(800, 500)
+
+        // Auto-select Kotlin and load versions by default (fallback to first tool)
+        javax.swing.SwingUtilities.invokeLater {
+            try {
+                val kotlinIndex = tools.indexOfFirst { it.name.equals("Kotlin", ignoreCase = true) }
+                val indexToSelect = when {
+                    kotlinIndex >= 0 -> kotlinIndex
+                    tools.isNotEmpty() -> 0
+                    else -> -1
+                }
+                if (indexToSelect >= 0) {
+                    toolsList.selectedIndex = indexToSelect
+                    toolsList.ensureIndexIsVisible(indexToSelect)
+                    // Selection listener will trigger version loading
+                }
+            } catch (_: Exception) {
+                // Ignore any errors during auto-selection to avoid breaking dialog
+            }
+        }
+
         return mainPanel
     }
     
@@ -101,7 +131,18 @@ class ToolVersionsDialog(
                 if (value != null) {
                     append(value.name)
                     append("  ")
-                    append("(${getTotalVersionsCount(value)} versions)", SimpleTextAttributes.GRAYED_ATTRIBUTES)
+                    when {
+                        loadingStates[value.name] == true -> {
+                            append("(Loading...)", SimpleTextAttributes.GRAYED_ITALIC_ATTRIBUTES)
+                        }
+                        loadedTools.containsKey(value.name) -> {
+                            val loadedTool = loadedTools[value.name]!!
+                            append("(${getTotalVersionsCount(loadedTool)} versions)", SimpleTextAttributes.GRAYED_ATTRIBUTES)
+                        }
+                        else -> {
+                            append("(Click to load)", SimpleTextAttributes.GRAYED_ATTRIBUTES)
+                        }
+                    }
                 }
             }
         }
@@ -111,14 +152,9 @@ class ToolVersionsDialog(
             if (!e.valueIsAdjusting) {
                 val selectedTool = toolsList.selectedValue
                 if (selectedTool != null) {
-                    updateVersionsDisplay(selectedTool)
+                    updateVersionsDisplayAsync(selectedTool)
                 }
             }
-        }
-        
-        // Select first tool by default
-        if (tools.isNotEmpty()) {
-            toolsList.selectedIndex = 0
         }
         
         val scrollPane = JBScrollPane(toolsList)
@@ -135,9 +171,11 @@ class ToolVersionsDialog(
     private fun createVersionsPanel(): JComponent {
         // versionsPanel is now pre-initialized in createCenterPanel()
         
-        // Initialize with first tool if available
+        // Show instruction to select a tool instead of automatically loading first tool
         if (tools.isNotEmpty()) {
-            updateVersionsDisplay(tools.first())
+            val instructionLabel = JBLabel("<html><center>Select a tool from the list to view available versions.<br/>Versions will be loaded on-demand.</center></html>")
+            instructionLabel.horizontalAlignment = SwingConstants.CENTER
+            versionsPanel.add(instructionLabel, BorderLayout.CENTER)
         } else {
             versionsPanel.add(JBLabel("No tools available."), BorderLayout.CENTER)
         }
@@ -145,6 +183,83 @@ class ToolVersionsDialog(
         return versionsPanel
     }
     
+    /**
+     * Updates the versions display for the selected tool, fetching versions if needed.
+     */
+    private fun updateVersionsDisplayAsync(tool: ToolVersionsManager.Tool) {
+        // Check if we already have this tool with loaded versions
+        val loadedTool = loadedTools[tool.name]
+        if (loadedTool != null) {
+            // Already loaded, display immediately
+            updateVersionsDisplay(loadedTool)
+            return
+        }
+        
+        // Check if already loading
+        if (loadingStates[tool.name] == true) {
+            return
+        }
+        
+        // Display loading state
+        versionsPanel.removeAll()
+        versionsPanel.add(JBLabel("Loading versions for ${tool.name}..."), BorderLayout.CENTER)
+        versionsPanel.revalidate()
+        versionsPanel.repaint()
+        
+        // Update loading state and refresh tool list
+        loadingStates[tool.name] = true
+        toolsList.repaint()
+        
+        // Fetch versions in background
+        ProgressManager.getInstance().run(object : Task.Backgroundable(project, "Loading ${tool.name} Versions", true) {
+            private var updatedTool: ToolVersionsManager.Tool? = null
+            private var error: Throwable? = null
+            
+            override fun run(indicator: ProgressIndicator) {
+                indicator.text = "Fetching ${tool.name} versions..."
+                indicator.isIndeterminate = true
+                
+                try {
+                    runBlocking {
+                        withContext(Dispatchers.IO) {
+                            updatedTool = toolsManager.fetchVersionsForTool(tool)
+                        }
+                    }
+                } catch (e: Exception) {
+                    error = e
+                }
+            }
+            
+            override fun onSuccess() {
+                ApplicationManager.getApplication().invokeLater {
+                    loadingStates[tool.name] = false
+                    
+                    if (error != null) {
+                        logger.warn("Failed to load versions for ${tool.name}", error)
+                        versionsPanel.removeAll()
+                        versionsPanel.add(JBLabel("Failed to load versions for ${tool.name}"), BorderLayout.CENTER)
+                        versionsPanel.revalidate()
+                        versionsPanel.repaint()
+                    } else if (updatedTool != null) {
+                        // Store loaded tool and update display
+                        loadedTools[tool.name] = updatedTool!!
+                        updateVersionsDisplay(updatedTool!!)
+                    }
+                    
+                    // Refresh tool list to update status
+                    toolsList.repaint()
+                }
+            }
+            
+            override fun onCancel() {
+                ApplicationManager.getApplication().invokeLater {
+                    loadingStates[tool.name] = false
+                    toolsList.repaint()
+                }
+            }
+        })
+    }
+
     /**
      * Updates the versions display for the selected tool.
      */

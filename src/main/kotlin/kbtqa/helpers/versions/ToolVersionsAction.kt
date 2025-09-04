@@ -39,69 +39,31 @@ class ToolVersionsAction : AnAction(
         
         logger.info("Tool Versions action triggered")
         
-        // Run the version fetching in a background task with progress indicator
-        ProgressManager.getInstance().run(object : Task.Backgroundable(project, "Loading Tool Versions", true) {
+        try {
+            val manager = ToolVersionsManager.getInstance()
             
-            private var tools: List<ToolVersionsManager.Tool> = emptyList()
-            private var error: Throwable? = null
+            // Get tools without loading versions (this is fast and synchronous)
+            val tools = manager.getAllToolsWithoutVersions()
             
-            override fun run(indicator: ProgressIndicator) {
-                indicator.text = "Fetching versions from repositories..."
-                indicator.isIndeterminate = true
-                
-                try {
-                    val manager = ToolVersionsManager.getInstance()
-                    
-                    // Run the suspend function in a coroutine
-                    runBlocking {
-                        withContext(Dispatchers.IO) {
-                            tools = manager.getAllToolsWithVersions()
-                        }
-                    }
-                    
-                    logger.info("Successfully loaded versions for ${tools.size} tools")
-                } catch (e: Exception) {
-                    logger.warn("Failed to fetch tool versions", e)
-                    error = e
-                }
+            if (tools.isEmpty()) {
+                Messages.showWarningDialog(
+                    project,
+                    "No tool version services were found.",
+                    "No Tools Available"
+                )
+            } else {
+                logger.info("Opening dialog with ${tools.size} tools (versions will be loaded on-demand)")
+                // Show the dialog - versions will be loaded on-demand when tools are selected
+                val dialog = ToolVersionsDialog(project, tools)
+                dialog.show()
             }
-            
-            override fun onSuccess() {
-                ApplicationManager.getApplication().invokeLater {
-                    if (error != null) {
-                        Messages.showErrorDialog(
-                            project,
-                            "Failed to fetch tool versions: ${error!!.message}",
-                            "Error Loading Versions"
-                        )
-                    } else if (tools.isEmpty()) {
-                        Messages.showWarningDialog(
-                            project,
-                            "No tool versions were found. Please check your internet connection.",
-                            "No Versions Found"
-                        )
-                    } else {
-                        // Show the dialog with the fetched tool versions
-                        val dialog = ToolVersionsDialog(project, tools)
-                        dialog.show()
-                    }
-                }
-            }
-            
-            override fun onCancel() {
-                logger.info("Tool versions loading was cancelled")
-            }
-            
-            override fun onThrowable(error: Throwable) {
-                logger.warn("Unexpected error while loading tool versions", error)
-                ApplicationManager.getApplication().invokeLater {
-                    Messages.showErrorDialog(
-                        project,
-                        "Unexpected error while loading tool versions: ${error.message}",
-                        "Error"
-                    )
-                }
-            }
-        })
+        } catch (e: Exception) {
+            logger.warn("Failed to get tool services", e)
+            Messages.showErrorDialog(
+                project,
+                "Failed to initialize tool version services: ${e.message}",
+                "Error"
+            )
+        }
     }
 }
