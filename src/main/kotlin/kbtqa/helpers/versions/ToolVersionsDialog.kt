@@ -276,11 +276,14 @@ class ToolVersionsDialog(
      * Determines if a channel should use columns layout based on tool and channel characteristics.
      */
     private fun shouldUseColumnsLayout(channel: VersionsService.VersionChannel, tool: ToolVersionsManager.Tool): Boolean {
-        // Do not apply grouping to Android and Kotlin stable channels
+        // Do not apply grouping to Android, Kotlin stable channels, and KSP
         if (tool.name == "Kotlin" && channel.name == "Stable") {
             return false
         }
         if (tool.name == "Android" && channel.name == "All") {
+            return false
+        }
+        if (tool.name == "KSP") {
             return false
         }
         

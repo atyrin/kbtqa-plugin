@@ -33,7 +33,8 @@ class ToolVersionsManager {
     fun getAllVersionServices(): List<VersionsService> {
         return listOf(
             ApplicationManager.getApplication().service<KotlinVersionsService>(),
-            ApplicationManager.getApplication().service<AndroidVersionsService>()
+            ApplicationManager.getApplication().service<AndroidVersionsService>(),
+            ApplicationManager.getApplication().service<KSPVersionsService>()
         )
     }
 
