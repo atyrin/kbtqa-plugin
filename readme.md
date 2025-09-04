@@ -19,8 +19,9 @@ For `gradle` directory in the file tree:
 
 ## General actions
 
-### Shows the latest kotlin versions
-An action available in the `Tools` menu. It will show all available kotlin versions from stable/dev and experimantal channels.
+### Shows the latest tooling versions
+An action available in the `Tools` menu. It will show all available versions from maven repositories for different tools. 
+KGP from stable/dev and experimental channels. AGP from google repo.
 
 
 # Updates

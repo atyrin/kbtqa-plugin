@@ -4,7 +4,6 @@ import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.ProgressManager
@@ -14,12 +13,12 @@ import com.intellij.openapi.ui.Messages
 import kotlinx.coroutines.*
 
 /**
- * Action that displays available Kotlin versions from different channels.
+ * Action that displays available versions for different tools (Kotlin, Android, etc.).
  * This action is available via IDE search and can be invoked from anywhere.
  */
-class KotlinVersionsAction : AnAction(
-    "Show Kotlin Versions (KGP)", // refer KGP for easy search with Shift + Shift
-    "Display available Kotlin versions from different channels (Stable, Dev, Experimental)",
+class ToolVersionsAction : AnAction(
+    "Show Tool Versions (KGP, AGP)",
+    "Display available versions for different development tools (Kotlin, Android Gradle Plugin, etc.)",
     null
 ), DumbAware {
 
@@ -38,31 +37,31 @@ class KotlinVersionsAction : AnAction(
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project
         
-        logger.info("Kotlin Versions action triggered")
+        logger.info("Tool Versions action triggered")
         
         // Run the version fetching in a background task with progress indicator
-        ProgressManager.getInstance().run(object : Task.Backgroundable(project, "Loading Kotlin Versions", true) {
+        ProgressManager.getInstance().run(object : Task.Backgroundable(project, "Loading Tool Versions", true) {
             
-            private var versionChannels: List<KotlinVersionsService.VersionChannel> = emptyList()
+            private var tools: List<ToolVersionsManager.Tool> = emptyList()
             private var error: Throwable? = null
             
             override fun run(indicator: ProgressIndicator) {
-                indicator.text = "Fetching Kotlin versions from repositories..."
+                indicator.text = "Fetching versions from repositories..."
                 indicator.isIndeterminate = true
                 
                 try {
-                    val service = ApplicationManager.getApplication().service<KotlinVersionsService>()
+                    val manager = ToolVersionsManager.getInstance()
                     
                     // Run the suspend function in a coroutine
                     runBlocking {
                         withContext(Dispatchers.IO) {
-                            versionChannels = service.getAllVersionChannels()
+                            tools = manager.getAllToolsWithVersions()
                         }
                     }
                     
-                    logger.info("Successfully loaded ${versionChannels.size} version channels")
+                    logger.info("Successfully loaded versions for ${tools.size} tools")
                 } catch (e: Exception) {
-                    logger.warn("Failed to fetch Kotlin versions", e)
+                    logger.warn("Failed to fetch tool versions", e)
                     error = e
                 }
             }
@@ -72,33 +71,33 @@ class KotlinVersionsAction : AnAction(
                     if (error != null) {
                         Messages.showErrorDialog(
                             project,
-                            "Failed to fetch Kotlin versions: ${error!!.message}",
+                            "Failed to fetch tool versions: ${error!!.message}",
                             "Error Loading Versions"
                         )
-                    } else if (versionChannels.isEmpty()) {
+                    } else if (tools.isEmpty()) {
                         Messages.showWarningDialog(
                             project,
-                            "No Kotlin versions were found. Please check your internet connection.",
+                            "No tool versions were found. Please check your internet connection.",
                             "No Versions Found"
                         )
                     } else {
-                        // Show the dialog with the fetched versions
-                        val dialog = KotlinVersionsDialog(project, versionChannels)
+                        // Show the dialog with the fetched tool versions
+                        val dialog = ToolVersionsDialog(project, tools)
                         dialog.show()
                     }
                 }
             }
             
             override fun onCancel() {
-                logger.info("Kotlin versions loading was cancelled")
+                logger.info("Tool versions loading was cancelled")
             }
             
             override fun onThrowable(error: Throwable) {
-                logger.warn("Unexpected error while loading Kotlin versions", error)
+                logger.warn("Unexpected error while loading tool versions", error)
                 ApplicationManager.getApplication().invokeLater {
                     Messages.showErrorDialog(
                         project,
-                        "Unexpected error while loading Kotlin versions: ${error.message}",
+                        "Unexpected error while loading tool versions: ${error.message}",
                         "Error"
                     )
                 }
