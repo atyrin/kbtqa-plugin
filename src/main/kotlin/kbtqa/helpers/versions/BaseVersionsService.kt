@@ -1,6 +1,8 @@
 package kbtqa.helpers.versions
 
 import com.intellij.openapi.diagnostic.thisLogger
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.net.URI
 import java.net.http.HttpClient
@@ -38,7 +40,7 @@ abstract class BaseVersionsService : VersionsService {
                 .GET()
                 .build()
 
-            val response = client.send(request, HttpResponse.BodyHandlers.ofString())
+            val response = withContext(Dispatchers.IO) { client.send(request, HttpResponse.BodyHandlers.ofString()) }
 
             if (response.statusCode() == 200) {
                 parseVersionsFromXml(response.body())
@@ -115,5 +117,16 @@ abstract class BaseVersionsService : VersionsService {
         }
 
         return 0
+    }
+
+    /**
+     * Helper to return a single VersionChannel list when versions exist, otherwise empty list.
+     */
+    protected fun singleChannelOrEmpty(
+        name: String,
+        description: String,
+        versions: List<String>
+    ): List<VersionsService.VersionChannel> {
+        return if (versions.isNotEmpty()) listOf(VersionsService.VersionChannel(name, description, versions)) else emptyList()
     }
 }

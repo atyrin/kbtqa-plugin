@@ -9,7 +9,7 @@ import com.intellij.openapi.diagnostic.thisLogger
  * Manager service that coordinates multiple tool version services.
  * Provides a unified interface for fetching versions from different tools.
  */
-@Service
+@Service(Service.Level.APP)
 class ToolVersionsManager {
 
     companion object {
@@ -35,7 +35,8 @@ class ToolVersionsManager {
         return listOf(
             lazy { ApplicationManager.getApplication().service<KotlinVersionsService>() },
             lazy { ApplicationManager.getApplication().service<AndroidVersionsService>() },
-            lazy { ApplicationManager.getApplication().service<KSPVersionsService>() }
+            lazy { ApplicationManager.getApplication().service<KSPVersionsService>() },
+            lazy { ApplicationManager.getApplication().service<DokkaVersionsService>() }
         )
     }
 

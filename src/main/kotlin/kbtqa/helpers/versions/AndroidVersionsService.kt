@@ -5,7 +5,7 @@ import com.intellij.openapi.components.Service
 /**
  * Service that retrieves available Android Gradle Plugin versions from Maven Google repository.
  */
-@Service
+@Service(Service.Level.APP)
 class AndroidVersionsService : BaseVersionsService() {
 
     companion object {
@@ -19,20 +19,10 @@ class AndroidVersionsService : BaseVersionsService() {
      */
     override suspend fun getAllVersionChannels(): List<VersionsService.VersionChannel> {
         val versions = getVersionsFromUrl(MAVEN_GOOGLE_URL)
-        
-        val channels = mutableListOf<VersionsService.VersionChannel>()
-        
-        // Add an "All" channel with all versions
-        if (versions.isNotEmpty()) {
-            channels.add(
-                VersionsService.VersionChannel(
-                    "All",
-                    "All available versions of Android Gradle Plugin from Maven Google",
-                    versions
-                )
-            )
-        }
-        
-        return channels
+        return singleChannelOrEmpty(
+            name = "All",
+            description = "All available versions of Android Gradle Plugin from Maven Google",
+            versions = versions
+        )
     }
 }

@@ -5,7 +5,7 @@ import com.intellij.openapi.components.Service
 /**
  * Service that retrieves available Kotlin versions from different channels (repositories).
  */
-@Service
+@Service(Service.Level.APP)
 class KotlinVersionsService : BaseVersionsService() {
 
     companion object {

@@ -355,7 +355,7 @@ class ToolVersionsDialog(
         headerPanel.border = JBUI.Borders.emptyBottom(10)
         headerPanel.add(descriptionLabel, BorderLayout.WEST)
 
-        // Add Copy repository button for Kotlin Dev and Experimental channels
+        // Add Copy repository button for Kotlin Dev/Experimental and Dokka Dev/Test channels
         if (tool.name == "Kotlin" && (channel.name.equals("Dev", ignoreCase = true) || channel.name.equals("Experimental", ignoreCase = true))) {
             val copyButton = JButton("Copy repository")
             copyButton.addActionListener {
@@ -363,6 +363,17 @@ class ToolVersionsDialog(
                     "https://redirector.kotlinlang.org/maven/dev"
                 } else {
                     "https://redirector.kotlinlang.org/maven/experimental"
+                }
+                copyVersionToClipboard(repoUrl, itemType = "Repository")
+            }
+            headerPanel.add(copyButton, BorderLayout.EAST)
+        } else if (tool.name == "Dokka" && (channel.name.equals("Dev", ignoreCase = true) || channel.name.equals("Test", ignoreCase = true))) {
+            val copyButton = JButton("Copy repository")
+            copyButton.addActionListener {
+                val repoUrl = if (channel.name.equals("Dev", ignoreCase = true)) {
+                    "https://redirector.kotlinlang.org/maven/dokka-dev"
+                } else {
+                    "https://redirector.kotlinlang.org/maven/dokka-test"
                 }
                 copyVersionToClipboard(repoUrl, itemType = "Repository")
             }
@@ -391,7 +402,7 @@ class ToolVersionsDialog(
      * Determines if a channel should use columns layout based on tool and channel characteristics.
      */
     private fun shouldUseColumnsLayout(channel: VersionsService.VersionChannel, tool: ToolVersionsManager.Tool): Boolean {
-        // Do not apply grouping to Android, Kotlin stable channels, and KSP
+        // Do not apply grouping to Android, Kotlin stable channels, KSP, and Dokka (all channels)
         if (tool.name == "Kotlin" && channel.name == "Stable") {
             return false
         }
@@ -399,6 +410,9 @@ class ToolVersionsDialog(
             return false
         }
         if (tool.name == "KSP") {
+            return false
+        }
+        if (tool.name == "Dokka") {
             return false
         }
         

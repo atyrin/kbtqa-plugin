@@ -5,7 +5,7 @@ import com.intellij.openapi.components.Service
 /**
  * Service that retrieves available KSP (Kotlin Symbol Processing) versions from Maven Central repository.
  */
-@Service
+@Service(Service.Level.APP)
 class KSPVersionsService : BaseVersionsService() {
 
     companion object {
@@ -19,20 +19,10 @@ class KSPVersionsService : BaseVersionsService() {
      */
     override suspend fun getAllVersionChannels(): List<VersionsService.VersionChannel> {
         val versions = getVersionsFromUrl(MAVEN_CENTRAL_URL)
-        
-        val channels = mutableListOf<VersionsService.VersionChannel>()
-        
-        // Add an "All" channel with all versions
-        if (versions.isNotEmpty()) {
-            channels.add(
-                VersionsService.VersionChannel(
-                    "All",
-                    "All available versions of KSP (Kotlin Symbol Processing) from Maven Central",
-                    versions
-                )
-            )
-        }
-        
-        return channels
+        return singleChannelOrEmpty(
+            name = "All",
+            description = "All available versions of KSP (Kotlin Symbol Processing) from Maven Central",
+            versions = versions
+        )
     }
 }
