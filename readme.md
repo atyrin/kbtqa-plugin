@@ -7,9 +7,13 @@ The options depend on the file where the context menu is opened.
 
 For `gradle.properties`:
 * a list with well-known properties.
+
 For `build.gradle.kts`:
 * _Configure maven repositories_ will add a repositories section with popular maven repositories.
 * _Add dependency_ will suggest a list of KMP dependencies (GAV coordinates)
+* _Add Compiler Options_ will insert Kotlin compiler options configuration.
+* _Add Publishing_ will add maven-publish plugin and publishing configuration.
+
 For `settings.gradle.kts`:
 * _Configure build scan_ will set up Gradle build cache—add plugin and a simple configuration.
 * _Configure build cache_ will add a simple build cache configuration.
