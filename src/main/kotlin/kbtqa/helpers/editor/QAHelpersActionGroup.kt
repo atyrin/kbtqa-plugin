@@ -33,7 +33,7 @@ class QAHelpersActionGroup : ActionGroup("QA Helpers", "Helper actions for QA ta
             Separator.create("Build Script"),
             AddDependencyAction(),
             AddCompilerOptionsAction(),
-            AddPublishingAction(),
+            AddJvmPublishingAction(),
             Separator.create("Settings"),
             ConfigureBuildScanAction(),
             ConfigureBuildCacheAction(),

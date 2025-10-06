@@ -10,7 +10,7 @@ import com.intellij.openapi.project.Project
  * Action that adds a context menu option for build.gradle.kts files
  * to insert Maven publishing configuration.
  */
-class AddPublishingAction : AnAction("Add Publishing", "Insert Maven publishing configuration", null), DumbAware {
+class AddJvmPublishingAction : AnAction("Add JVM Publishing", "Insert Maven publishing configuration", null), DumbAware {
 
     companion object {
         private const val MAVEN_PUBLISH_PLUGIN = """

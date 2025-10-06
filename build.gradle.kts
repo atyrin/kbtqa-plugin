@@ -32,7 +32,7 @@ intellijPlatform {
         }
 
         changeNotes = """
-      Add Tooling versions discovery (1.2.2)
+      Add Configuration for Compiler options and JVM publication (1.3.0)
     """.trimIndent()
         description = project.file("src/main/resources/description.html").readText()
     }
