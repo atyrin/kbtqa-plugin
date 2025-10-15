@@ -34,6 +34,7 @@ class GradlePropertiesAction : AnAction("Add Gradle Property", "Insert a Gradle 
             PropertyItem.Entry("kotlin.kmp.isolated-projects.support=enable"),
             PropertyItem.Entry("kotlin.internal.kmp.kmpPublicationStrategy=uklibPublicationInASingleComponentWithKMPPublication"),
             PropertyItem.Entry("kotlin.internal.kmp.kmpResolutionStrategy=interlibraryUklibAndPSMResolution_PreferUklibs"),
+            PropertyItem.Entry("kotlin.internal.kmp.enableUKlibs=true"),
             PropertyItem.Entry("kotlin.stdlib.default.dependency=false"),
             PropertyItem.Entry("kotlin.mpp.enableCInteropCommonization=true"),
             PropertyItem.Separator,
