@@ -32,7 +32,7 @@ intellijPlatform {
         }
 
         changeNotes = """
-      Add Configuration for Compiler options and JVM publication (1.3.0)
+      Add project cleanup and compress (1.4.0)
     """.trimIndent()
         description = project.file("src/main/resources/description.html").readText()
     }

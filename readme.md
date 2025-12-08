@@ -21,6 +21,10 @@ For `settings.gradle.kts`:
 For `gradle` directory in the file tree:
 * _Configure version catalog_ will create a file `libs.versions.toml` with a sample catalog.
 
+For project root:
+* Delete `.gradle`, `.kotlin` and `build` directories.
+* Create a zip archive of the project.
+
 ## General actions
 
 ### Shows the latest tooling versions

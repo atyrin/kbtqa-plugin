@@ -56,6 +56,13 @@
                 description="Create or validate libs.versions.toml file">
             <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
         </action>
+        <action id="kbtqa.helpers.projectview.PrepareUploadAction"
+                class="kbtqa.helpers.projectview.PrepareUploadAction"
+                text="Prepare Upload"
+                description="Prepare project for uploading to bug tracker as reproducer (delete caches and create zip)">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+            <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
+        </action>
         <group id="kbtqa.helpers.editor.QAHelpersActionGroup"
                 class="kbtqa.helpers.editor.QAHelpersActionGroup"
                 text="QA Helpers"
