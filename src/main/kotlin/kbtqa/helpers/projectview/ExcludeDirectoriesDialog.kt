@@ -11,6 +11,7 @@ import com.intellij.util.ui.JBUI
 import java.awt.BorderLayout
 import java.awt.CardLayout
 import java.awt.Dimension
+import java.awt.Font
 import java.io.File
 import javax.swing.BoxLayout
 import javax.swing.JComponent
@@ -18,8 +19,23 @@ import javax.swing.JPanel
 import javax.swing.SwingUtilities
 
 /**
+ * Categories for grouping excludable items in the dialog.
+ */
+enum class ExclusionCategory(val displayName: String, val order: Int) {
+    BUILD_OUTPUT("Build Output", 1),
+    GRADLE_CACHE("Gradle Cache", 2),
+    KOTLIN_CACHE("Kotlin Cache", 3),
+    IDE_SETTINGS("IDE Settings", 4),
+    VERSION_CONTROL("Version Control", 5),
+    AI_ASSISTANT("AI Assistant", 6),
+    CONFIGURATION_FILES("Configuration Files", 7),
+    OTHER("Other", 8)
+}
+
+/**
  * Dialog that allows users to select directories and files to exclude from the zip archive.
  * Shows a list of directories and files with checkboxes - checked items will be excluded.
+ * Items are grouped by category for better organization.
  */
 class ExcludeDirectoriesDialog(
     project: Project?,
@@ -41,11 +57,13 @@ class ExcludeDirectoriesDialog(
      * @param relativePath The relative path from project root
      * @param isDefaultExclusion Whether this item is excluded by default
      * @param isFile Whether this is a file (true) or directory (false)
+     * @param category The category for grouping this item in the UI
      */
     data class ExcludableItem(
         val relativePath: String,
         val isDefaultExclusion: Boolean,
-        val isFile: Boolean = false
+        val isFile: Boolean = false,
+        val category: ExclusionCategory = ExclusionCategory.OTHER
     )
 
     init {
@@ -69,7 +87,8 @@ class ExcludeDirectoriesDialog(
         val result = mutableListOf<ExcludableItem>()
         scanTopLevelOnlyItems(result)
         scanDirectory(projectDir, "", result)
-        result.sortWith(compareBy({ !it.isDefaultExclusion }, { it.relativePath }))
+        // Sort by category order first, then by relative path within each category
+        result.sortWith(compareBy({ it.category.order }, { it.relativePath }))
         return result
     }
 
@@ -81,10 +100,20 @@ class ExcludeDirectoriesDialog(
         projectDir.listFiles()?.forEach { file ->
             when {
                 file.isDirectory && file.name in TOP_LEVEL_ONLY_DIRECTORIES -> {
-                    target.add(ExcludableItem(file.name, isDefaultExclusion = true, isFile = false))
+                    target.add(ExcludableItem(
+                        relativePath = file.name,
+                        isDefaultExclusion = true,
+                        isFile = false,
+                        category = getCategoryForDirectory(file.name)
+                    ))
                 }
                 file.isFile && file.name in TOP_LEVEL_ONLY_FILES -> {
-                    target.add(ExcludableItem(file.name, isDefaultExclusion = true, isFile = true))
+                    target.add(ExcludableItem(
+                        relativePath = file.name,
+                        isDefaultExclusion = true,
+                        isFile = true,
+                        category = getCategoryForFile(file.name)
+                    ))
                 }
             }
         }
@@ -105,11 +134,21 @@ class ExcludeDirectoriesDialog(
                 // Show default exclusion directories that can appear in subdirectories
                 when (file.name) {
                     in defaultDirectoryExclusions -> {
-                        target.add(ExcludableItem(childRelativePath, isDefaultExclusion = true, isFile = false))
+                        target.add(ExcludableItem(
+                            relativePath = childRelativePath,
+                            isDefaultExclusion = true,
+                            isFile = false,
+                            category = getCategoryForDirectory(file.name)
+                        ))
                     }
                     // Show build directories in Gradle module directories
                     "build" if isGradleModuleDirectory(dir) -> {
-                        target.add(ExcludableItem(childRelativePath, isDefaultExclusion = true, isFile = false))
+                        target.add(ExcludableItem(
+                            relativePath = childRelativePath,
+                            isDefaultExclusion = true,
+                            isFile = false,
+                            category = ExclusionCategory.BUILD_OUTPUT
+                        ))
                     }
                     else -> {
                         // Recursively scan subdirectories to find nested build folders
@@ -123,9 +162,39 @@ class ExcludeDirectoriesDialog(
                 }
                 // Check if this file should be excluded by default
                 if (file.name in defaultFileExclusions) {
-                    target.add(ExcludableItem(childRelativePath, isDefaultExclusion = true, isFile = true))
+                    target.add(ExcludableItem(
+                        relativePath = childRelativePath,
+                        isDefaultExclusion = true,
+                        isFile = true,
+                        category = getCategoryForFile(file.name)
+                    ))
                 }
             }
+        }
+    }
+
+    /**
+     * Determines the category for a directory based on its name.
+     */
+    private fun getCategoryForDirectory(name: String): ExclusionCategory {
+        return when (name) {
+            "build" -> ExclusionCategory.BUILD_OUTPUT
+            ".gradle" -> ExclusionCategory.GRADLE_CACHE
+            ".kotlin" -> ExclusionCategory.KOTLIN_CACHE
+            ".idea" -> ExclusionCategory.IDE_SETTINGS
+            ".git" -> ExclusionCategory.VERSION_CONTROL
+            ".junie" -> ExclusionCategory.AI_ASSISTANT
+            else -> ExclusionCategory.OTHER
+        }
+    }
+
+    /**
+     * Determines the category for a file based on its name.
+     */
+    private fun getCategoryForFile(name: String): ExclusionCategory {
+        return when (name) {
+            "local.properties" -> ExclusionCategory.CONFIGURATION_FILES
+            else -> ExclusionCategory.OTHER
         }
     }
 
@@ -183,23 +252,41 @@ class ExcludeDirectoriesDialog(
             contentPanel.add(JBLabel("No excludable items found in the project."), BorderLayout.CENTER)
         } else {
             checkboxes.clear()
-            // Create panel with checkboxes
+            // Create panel with checkboxes grouped by category
             val checkboxPanel = JPanel()
             checkboxPanel.layout = BoxLayout(checkboxPanel, BoxLayout.Y_AXIS)
             checkboxPanel.border = JBUI.Borders.empty(5)
 
-            for (item in excludableItems) {
-                val checkbox = JBCheckBox(item.relativePath)
-                checkbox.isSelected = item.isDefaultExclusion
-                checkbox.toolTipText = when {
-                    item.isFile && item.isDefaultExclusion -> "This file is excluded by default"
-                    item.isFile -> "Check to exclude this file from the archive"
-                    item.isDefaultExclusion -> "This directory is excluded by default (cache/build folder)"
-                    else -> "Check to exclude this directory from the archive"
+            // Group items by category
+            val itemsByCategory = excludableItems.groupBy { it.category }
+            
+            // Iterate through categories in order
+            ExclusionCategory.entries
+                .filter { it in itemsByCategory }
+                .forEach { category ->
+                    val items = itemsByCategory[category] ?: return@forEach
+                    
+                    // Add category header
+                    val categoryHeader = JBLabel(category.displayName)
+                    categoryHeader.font = categoryHeader.font.deriveFont(Font.BOLD)
+                    categoryHeader.border = JBUI.Borders.empty(8, 0, 4, 0)
+                    checkboxPanel.add(categoryHeader)
+                    
+                    // Add checkboxes for items in this category
+                    for (item in items) {
+                        val checkbox = JBCheckBox(item.relativePath)
+                        checkbox.isSelected = item.isDefaultExclusion
+                        checkbox.toolTipText = when {
+                            item.isFile && item.isDefaultExclusion -> "This file is excluded by default"
+                            item.isFile -> "Check to exclude this file from the archive"
+                            item.isDefaultExclusion -> "This directory is excluded by default (cache/build folder)"
+                            else -> "Check to exclude this directory from the archive"
+                        }
+                        checkbox.border = JBUI.Borders.emptyLeft(16)
+                        checkboxes[item.relativePath] = checkbox
+                        checkboxPanel.add(checkbox)
+                    }
                 }
-                checkboxes[item.relativePath] = checkbox
-                checkboxPanel.add(checkbox)
-            }
 
             val scrollPane = JBScrollPane(checkboxPanel)
             scrollPane.border = JBUI.Borders.empty()
