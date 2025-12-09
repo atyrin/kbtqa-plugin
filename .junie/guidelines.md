@@ -95,3 +95,7 @@ kbtqa-plugin/
 - Maintain separation between helpers and stacktraces packages
 - Ensure proper error handling and user feedback
 - Test edge cases, especially file type detection and context validation
+
+### Documentation
+- After adding a new feature, make sure that documentation is updated accordingly
+- documentation: readme.md, src/main/resources/description.html
