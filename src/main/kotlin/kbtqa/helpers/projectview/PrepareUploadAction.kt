@@ -39,14 +39,20 @@ class PrepareUploadAction :
         val project = e.project
         val selectedFile = e.getData(CommonDataKeys.VIRTUAL_FILE)
         
-        // Show action only when the selected item is the project root directory
-        val isProjectRoot = project != null && 
-                project.basePath != null && 
-                selectedFile != null && 
-                selectedFile.path == project.basePath
+        // Check if we have a valid project
+        val hasProject = project != null && project.basePath != null
         
-        e.presentation.isVisible = isProjectRoot
-        e.presentation.isEnabled = isProjectRoot
+        // Check if this is being invoked from project view context (has selected file)
+        val isProjectViewContext = selectedFile != null
+        
+        // In project view context, only show when project root is selected
+        // In other contexts (like Tools menu), show when a project is open
+        val isProjectRoot = hasProject && selectedFile?.path == project.basePath
+        
+        val shouldShow = if (isProjectViewContext) isProjectRoot else hasProject
+        
+        e.presentation.isVisible = shouldShow
+        e.presentation.isEnabled = shouldShow
     }
 
     override fun actionPerformed(e: AnActionEvent) {
