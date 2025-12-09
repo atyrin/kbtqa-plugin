@@ -15,6 +15,8 @@ import java.awt.Desktop
 import java.io.File
 import java.io.FileOutputStream
 import java.nio.file.Files
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
@@ -22,20 +24,14 @@ import java.util.zip.ZipOutputStream
  * Action that prepares a project for uploading to a bug tracker as a reproducer.
  * 
  * This action performs the following steps:
- * 1. Deletes cache folders (.gradle, .kotlin, build) from the project root and all subprojects
- * 2. Creates a zip archive of the cleaned project
- * 3. Opens the zip file location in Finder (macOS) or Windows Explorer
+ * 1. Creates a zip archive of the project, excluding cache folders (.gradle, .kotlin, .idea, build)
+ * 2. Opens the zip file location in Finder (macOS) or Windows Explorer
+ * 
+ * Note: Cache folders are excluded from the zip but remain in their original location.
  */
 class PrepareUploadAction :
     AnAction("Prepare Upload", "Prepare project for uploading to bug tracker as reproducer", null),
     DumbAware {
-
-    companion object {
-        // Cache folders that should always be deleted regardless of location
-        private val ALWAYS_DELETE_CACHE_FOLDERS = setOf(".gradle", ".kotlin")
-        // Gradle build script file names - used to identify Gradle module directories
-        private val GRADLE_BUILD_FILES = setOf("build.gradle", "build.gradle.kts")
-    }
 
     override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.BGT
 
@@ -68,16 +64,9 @@ class PrepareUploadAction :
                 try {
                     indicator.isIndeterminate = false
                     
-                    // Step 1: Delete cache folders
-                    indicator.text = "Deleting cache folders..."
-                    indicator.fraction = 0.0
-                    deleteCacheFolders(projectDir, indicator)
-                    
-                    if (indicator.isCanceled) return
-                    
-                    // Step 2: Create zip file
+                    // Step 1: Create zip file (excluding cache folders)
                     indicator.text = "Creating zip archive..."
-                    indicator.fraction = 0.5
+                    indicator.fraction = 0.0
                     val zipFile = createZipArchive(projectDir, indicator)
                     
                     if (indicator.isCanceled) {
@@ -85,7 +74,7 @@ class PrepareUploadAction :
                         return
                     }
                     
-                    // Step 3: Refresh VFS and open in file explorer
+                    // Step 2: Refresh VFS and open in file explorer
                     indicator.text = "Opening file location..."
                     indicator.fraction = 0.9
 
@@ -112,69 +101,11 @@ class PrepareUploadAction :
     }
 
     /**
-     * Recursively deletes all cache folders (.gradle, .kotlin, build) from the project directory.
-     */
-    private fun deleteCacheFolders(projectDir: File, indicator: ProgressIndicator) {
-        val foldersToDelete = mutableListOf<File>()
-        
-        // Find all cache folders
-        findCacheFolders(projectDir, foldersToDelete)
-        
-        // Delete found folders
-        val totalFolders = foldersToDelete.size
-        foldersToDelete.forEachIndexed { index, folder ->
-            if (indicator.isCanceled) return
-            indicator.text2 = "Deleting: ${folder.relativeTo(projectDir).path}"
-            indicator.fraction = (index.toDouble() / totalFolders) * 0.5
-            deleteRecursively(folder)
-        }
-    }
-
-    /**
-     * Recursively finds all cache folders in the project directory.
-     * - .gradle and .kotlin folders are always considered cache folders
-     * - "build" folders are only considered cache folders if they are in a Gradle module directory
-     *   (i.e., the parent directory contains build.gradle or build.gradle.kts)
-     */
-    private fun findCacheFolders(dir: File, result: MutableList<File>) {
-        if (!dir.isDirectory) return
-        
-        dir.listFiles()?.forEach { file ->
-            if (file.isDirectory) {
-                when {
-                    file.name in ALWAYS_DELETE_CACHE_FOLDERS -> {
-                        // Always delete .gradle and .kotlin folders
-                        result.add(file)
-                    }
-                    file.name == "build" && isGradleModuleDirectory(dir) -> {
-                        // Only delete "build" folder if it's in a Gradle module directory
-                        result.add(file)
-                    }
-                    else -> {
-                        // Recurse into other directories
-                        findCacheFolders(file, result)
-                    }
-                }
-            }
-        }
-    }
-
-    /**
      * Checks if the given directory is a Gradle module directory
      * (contains build.gradle or build.gradle.kts).
      */
     private fun isGradleModuleDirectory(dir: File): Boolean {
         return dir.listFiles()?.any { it.isFile && it.name in GRADLE_BUILD_FILES } == true
-    }
-
-    /**
-     * Recursively deletes a directory and all its contents.
-     */
-    private fun deleteRecursively(file: File) {
-        if (file.isDirectory) {
-            file.listFiles()?.forEach { deleteRecursively(it) }
-        }
-        file.delete()
     }
 
     /**
@@ -185,9 +116,11 @@ class PrepareUploadAction :
         val projectName = projectDir.name
         val zipFile = File(projectDir.parentFile, "${projectName}.zip")
         
-        // Delete existing zip file if it exists
+        // Rename existing zip file if it exists (adding _old_ and timestamp)
         if (zipFile.exists()) {
-            zipFile.delete()
+            val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
+            val oldZipFile = File(projectDir.parentFile, "${projectName}_old_${timestamp}.zip")
+            zipFile.renameTo(oldZipFile)
         }
         
         // Collect all files to zip (excluding cache folders)
@@ -202,7 +135,7 @@ class PrepareUploadAction :
                 
                 val relativePath = file.relativeTo(projectDir).path
                 indicator.text2 = "Zipping: $relativePath"
-                indicator.fraction = 0.5 + (index.toDouble() / totalFiles) * 0.4
+                indicator.fraction = (index.toDouble() / totalFiles) * 0.9
                 
                 val entryPath = "$projectName/$relativePath"
                 
@@ -222,7 +155,9 @@ class PrepareUploadAction :
 
     /**
      * Collects all files to include in the zip archive, excluding cache folders.
-     * Uses the same logic as findCacheFolders to determine which folders to exclude.
+     * - .gradle and .kotlin folders are always excluded
+     * - "build" folders are excluded only if they are in a Gradle module directory
+     *   (i.e., the parent directory contains build.gradle or build.gradle.kts)
      */
     private fun collectFilesToZip(dir: File, result: MutableList<File>) {
         if (!dir.isDirectory) return
@@ -230,7 +165,7 @@ class PrepareUploadAction :
         dir.listFiles()?.forEach { file ->
             if (file.isDirectory) {
                 val shouldExclude = when {
-                    file.name in ALWAYS_DELETE_CACHE_FOLDERS -> true
+                    file.name in ALWAYS_EXCLUDE_CACHE_FOLDERS -> true
                     file.name == "build" && isGradleModuleDirectory(dir) -> true
                     else -> false
                 }
@@ -280,3 +215,9 @@ class PrepareUploadAction :
         }
     }
 }
+
+// Cache folders that should always be excluded from the zip archive
+private val ALWAYS_EXCLUDE_CACHE_FOLDERS = setOf(".gradle", ".kotlin", ".idea")
+
+// Gradle build script file names - used to identify Gradle module directories
+private val GRADLE_BUILD_FILES = setOf("build.gradle", "build.gradle.kts")
