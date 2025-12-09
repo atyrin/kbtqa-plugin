@@ -59,15 +59,24 @@ class PrepareUploadAction :
             return
         }
 
+        // Show dialog to select directories and files to exclude
+        val dialog = ExcludeDirectoriesDialog(project, projectDir, ALWAYS_EXCLUDE_CACHE_FOLDERS, DEFAULT_EXCLUDE_FILES)
+        if (!dialog.showAndGet()) {
+            // User cancelled the dialog
+            return
+        }
+        
+        val selectedExclusions = dialog.getSelectedExclusions()
+
         ProgressManager.getInstance().run(object : Task.Backgroundable(project, "Preparing Project for Upload", true, ALWAYS_BACKGROUND) {
             override fun run(indicator: ProgressIndicator) {
                 try {
                     indicator.isIndeterminate = false
                     
-                    // Step 1: Create zip file (excluding cache folders)
+                    // Step 1: Create zip file (excluding selected folders)
                     indicator.text = "Creating zip archive..."
                     indicator.fraction = 0.0
-                    val zipFile = createZipArchive(projectDir, indicator)
+                    val zipFile = createZipArchive(projectDir, selectedExclusions, indicator)
                     
                     if (indicator.isCanceled) {
                         zipFile.delete()
@@ -101,18 +110,13 @@ class PrepareUploadAction :
     }
 
     /**
-     * Checks if the given directory is a Gradle module directory
-     * (contains build.gradle or build.gradle.kts).
-     */
-    private fun isGradleModuleDirectory(dir: File): Boolean {
-        return dir.listFiles()?.any { it.isFile && it.name in GRADLE_BUILD_FILES } == true
-    }
-
-    /**
      * Creates a zip archive of the project directory.
      * The zip file is created in the parent directory of the project.
+     * @param projectDir The project directory to archive
+     * @param excludedPaths Set of relative paths to exclude from the archive
+     * @param indicator Progress indicator for the operation
      */
-    private fun createZipArchive(projectDir: File, indicator: ProgressIndicator): File {
+    private fun createZipArchive(projectDir: File, excludedPaths: Set<String>, indicator: ProgressIndicator): File {
         val projectName = projectDir.name
         val zipFile = File(projectDir.parentFile, "${projectName}.zip")
         
@@ -123,9 +127,9 @@ class PrepareUploadAction :
             zipFile.renameTo(oldZipFile)
         }
         
-        // Collect all files to zip (excluding cache folders)
+        // Collect all files to zip (excluding selected folders)
         val filesToZip = mutableListOf<File>()
-        collectFilesToZip(projectDir, filesToZip)
+        collectFilesToZip(projectDir, projectDir, excludedPaths, filesToZip)
         
         val totalFiles = filesToZip.size
         
@@ -154,27 +158,30 @@ class PrepareUploadAction :
     }
 
     /**
-     * Collects all files to include in the zip archive, excluding cache folders.
-     * - .gradle and .kotlin folders are always excluded
-     * - "build" folders are excluded only if they are in a Gradle module directory
-     *   (i.e., the parent directory contains build.gradle or build.gradle.kts)
+     * Collects all files to include in the zip archive, excluding selected folders and files.
+     * @param projectRoot The root directory of the project (used for relative path calculation)
+     * @param dir The current directory being scanned
+     * @param excludedPaths Set of relative paths (directories and files) to exclude from the archive
+     * @param result List to collect files to include in the archive
      */
-    private fun collectFilesToZip(dir: File, result: MutableList<File>) {
+    private fun collectFilesToZip(projectRoot: File, dir: File, excludedPaths: Set<String>, result: MutableList<File>) {
         if (!dir.isDirectory) return
         
         dir.listFiles()?.forEach { file ->
+            // Calculate relative path for exclusion check
+            val relativePath = file.relativeTo(projectRoot).path
+            val shouldExclude = excludedPaths.contains(relativePath)
+            
             if (file.isDirectory) {
-                val shouldExclude = when {
-                    file.name in ALWAYS_EXCLUDE_CACHE_FOLDERS -> true
-                    file.name == "build" && isGradleModuleDirectory(dir) -> true
-                    else -> false
-                }
                 if (!shouldExclude) {
                     result.add(file)
-                    collectFilesToZip(file, result)
+                    collectFilesToZip(projectRoot, file, excludedPaths, result)
                 }
             } else {
-                result.add(file)
+                // Also check file exclusions
+                if (!shouldExclude) {
+                    result.add(file)
+                }
             }
         }
     }
@@ -217,7 +224,7 @@ class PrepareUploadAction :
 }
 
 // Cache folders that should always be excluded from the zip archive
-private val ALWAYS_EXCLUDE_CACHE_FOLDERS = setOf(".gradle", ".kotlin", ".idea")
+private val ALWAYS_EXCLUDE_CACHE_FOLDERS = setOf(".gradle", ".kotlin", ".idea", ".git", ".junie")
 
-// Gradle build script file names - used to identify Gradle module directories
-private val GRADLE_BUILD_FILES = setOf("build.gradle", "build.gradle.kts")
+// Files that should be excluded by default from the zip archive
+private val DEFAULT_EXCLUDE_FILES = setOf("local.properties")
