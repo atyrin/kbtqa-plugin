@@ -2,7 +2,7 @@
 
 ## Context menu action
 
-Action available under _QA Helpers_ menu. 
+Action is available under the _QA Helpers_ context menu. 
 The options depend on the file where the context menu is opened.
 
 For `gradle.properties`:
@@ -21,8 +21,8 @@ For `settings.gradle.kts`:
 For `gradle` directory in the file tree:
 * _Configure version catalog_ will create a file `libs.versions.toml` with a sample catalog.
 
-For project root:
-* Delete `.gradle`, `.kotlin` and `build` directories.
+For the project root directory:
+* Delete `.gradle`, `.kotlin`, `.idea`, `.git` and `build` directories. Also `local.properties` file. The full will be shown in the popup. 
 * Create a zip archive of the project.
 
 ## General actions
@@ -32,6 +32,8 @@ An action available in the `Tools` menu. It will show all available versions fro
 KGP from stable/dev and experimental channels. AGP from google repo. KSP and Dokka from maven central.
 
 
-# Updates
+# Installation and Updates
 
-Add `https://raw.githubusercontent.com/atyrin/kbtqa-plugin/refs/heads/main/repository/updatePlugins.xml` as a plugin repository.
+1. Add `https://raw.githubusercontent.com/atyrin/kbtqa-plugin/refs/heads/main/repository/updatePlugins.xml` as a plugin repository.
+2. In the Plugins → Marketplace you will see the plugin in the end of the list.
+3. It will also automatically get the plugin updates.

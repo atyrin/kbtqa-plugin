@@ -1,12 +1,43 @@
 <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M32.0845 7.94025V4H24.0203V7.9896H16.029V4H7.91553V7.94025H4V36H16.0044V32.0045C16.0058 30.9457 16.4274 29.9308 17.1766 29.1826C17.9258 28.4345 18.9412 28.0143 20 28.0143C21.0588 28.0143 22.0743 28.4345 22.8234 29.1826C23.5726 29.9308 23.9942 30.9457 23.9956 32.0045V36H36V7.94025H32.0845Z"
-          fill="url(#paint0_linear)"/>
+    <!-- Swiss Knife body (main handle) -->
+    <rect x="12" y="14" width="16" height="12" rx="2" fill="url(#paint0_linear)"/>
+    
+    <!-- Knife blade (top-right, extended) -->
+    <path d="M28 16 L38 10 L38 12 L28 18 Z" fill="url(#paint1_linear)"/>
+    
+    <!-- Screwdriver (top, extended upward) -->
+    <path d="M18 14 L18 4 L20 2 L22 4 L22 14 Z" fill="url(#paint1_linear)"/>
+    
+    <!-- Bottle opener / file (bottom-right, extended) -->
+    <path d="M28 22 L36 28 L34 30 L28 24 Z" fill="url(#paint1_linear)"/>
+    
+    <!-- Small tool (left, extended) -->
+    <path d="M12 18 L4 16 L4 18 L12 20 Z" fill="url(#paint1_linear)"/>
+    
+    <!-- Wrench tool (bottom-left, extended) -->
+    <path d="M12 24 L6 32 L8 34 L14 26 Z" fill="url(#paint1_linear)"/>
+    
+    <!-- Center pivot circle -->
+    <circle cx="20" cy="20" r="3" fill="#FFFFFF" fill-opacity="0.9"/>
+    <circle cx="20" cy="20" r="1.5" fill="url(#paint2_linear)"/>
+    
+    <!-- K letter accent for Kotlin -->
+    <path d="M16 16 L16 24 L18 24 L18 21 L21 24 L24 24 L20 20 L24 16 L21 16 L18 19 L18 16 Z" fill="#FFFFFF" fill-opacity="0.3"/>
+    
     <defs>
-        <linearGradient id="paint0_linear" x1="2.94192" y1="4.89955" x2="37.7772" y2="39.7345"
-                        gradientUnits="userSpaceOnUse">
-            <stop offset="0.15937" stop-color="#3BEA62"/>
-            <stop offset="0.5404" stop-color="#3C99CC"/>
-            <stop offset="0.93739" stop-color="#6B57FF"/>
+        <linearGradient id="paint0_linear" x1="12" y1="14" x2="28" y2="26" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#3BEA62"/>
+            <stop offset="0.5" stop-color="#3C99CC"/>
+            <stop offset="1" stop-color="#6B57FF"/>
+        </linearGradient>
+        <linearGradient id="paint1_linear" x1="4" y1="2" x2="38" y2="34" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#2DD853"/>
+            <stop offset="0.5" stop-color="#2B88BB"/>
+            <stop offset="1" stop-color="#5A46EE"/>
+        </linearGradient>
+        <linearGradient id="paint2_linear" x1="18" y1="18" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#3BEA62"/>
+            <stop offset="1" stop-color="#6B57FF"/>
         </linearGradient>
     </defs>
 </svg>
