@@ -1,7 +1,9 @@
+import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
+
 plugins {
     id("java")
-    id("org.jetbrains.kotlin.jvm") version "2.3.0"
-    id("org.jetbrains.intellij.platform") version "2.10.5"
+    id("org.jetbrains.kotlin.jvm") version "2.3.20-Beta2"
+    id("org.jetbrains.intellij.platform") version "2.11.0"
 }
 
 repositories {
@@ -11,11 +13,18 @@ repositories {
     }
 }
 
+kotlin {
+    compilerOptions {
+        // to avoid http://youtrack.jetbrains.com/projects/KT/issues/KT-79354/
+        apiVersion.set(KotlinVersion.KOTLIN_2_2)
+    }
+}
+
 // Configure Gradle IntelliJ Plugin
 // Read more: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin.html
 dependencies {
     intellijPlatform {
-        create("IC", "2025.1")
+        create("IC", "2025.2")
         testFramework(org.jetbrains.intellij.platform.gradle.TestFrameworkType.Platform)
 
         // Add necessary plugin dependencies for compilation here, example:
@@ -28,7 +37,7 @@ dependencies {
 intellijPlatform {
     pluginConfiguration {
         ideaVersion {
-            sinceBuild = "251"
+            sinceBuild = "252"
         }
 
         changeNotes = """
