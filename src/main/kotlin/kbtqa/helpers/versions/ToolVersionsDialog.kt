@@ -46,11 +46,15 @@ class ToolVersionsDialog(
     private var currentTool: ToolVersionsManager.Tool? = null
     private var searchField: SearchTextField? = null
     private var currentFilter: String = ""
-    
+
     // Track loaded tools and loading states
     private val loadedTools = mutableMapOf<String, ToolVersionsManager.Tool>()
     private val loadingStates = mutableMapOf<String, Boolean>()
     private val toolsManager = ToolVersionsManager.getInstance()
+
+    // Gradle pagination state
+    private var gradlePrevUrl: String? = null
+    private var gradleNextUrl: String? = null
 
     init {
         title = "Tool Versions"
@@ -187,6 +191,12 @@ class ToolVersionsDialog(
      * Updates the versions display for the selected tool, fetching versions if needed.
      */
     private fun updateVersionsDisplayAsync(tool: ToolVersionsManager.Tool) {
+        // For Gradle, use paginated loading
+        if (tool.name == "Gradle") {
+            fetchGradlePage(tool, null)
+            return
+        }
+
         // Check if we already have this tool with loaded versions
         val loadedTool = loadedTools[tool.name]
         if (loadedTool != null) {
@@ -194,31 +204,31 @@ class ToolVersionsDialog(
             updateVersionsDisplay(loadedTool)
             return
         }
-        
+
         // Check if already loading
         if (loadingStates[tool.name] == true) {
             return
         }
-        
+
         // Display loading state
         versionsPanel.removeAll()
         versionsPanel.add(JBLabel("Loading versions for ${tool.name}..."), BorderLayout.CENTER)
         versionsPanel.revalidate()
         versionsPanel.repaint()
-        
+
         // Update loading state and refresh tool list
         loadingStates[tool.name] = true
         toolsList.repaint()
-        
+
         // Fetch versions in background
         ProgressManager.getInstance().run(object : Task.Backgroundable(project, "Loading ${tool.name} Versions", true) {
             private var updatedTool: ToolVersionsManager.Tool? = null
             private var error: Throwable? = null
-            
+
             override fun run(indicator: ProgressIndicator) {
                 indicator.text = "Fetching ${tool.name} versions..."
                 indicator.isIndeterminate = true
-                
+
                 try {
                     runBlocking {
                         withContext(Dispatchers.IO) {
@@ -229,11 +239,11 @@ class ToolVersionsDialog(
                     error = e
                 }
             }
-            
+
             override fun onSuccess() {
                 ApplicationManager.getApplication().invokeLater {
                     loadingStates[tool.name] = false
-                    
+
                     if (error != null) {
                         logger.warn("Failed to load versions for ${tool.name}", error)
                         versionsPanel.removeAll()
@@ -245,12 +255,107 @@ class ToolVersionsDialog(
                         loadedTools[tool.name] = updatedTool!!
                         updateVersionsDisplay(updatedTool!!)
                     }
-                    
+
                     // Refresh tool list to update status
                     toolsList.repaint()
                 }
             }
-            
+
+            override fun onCancel() {
+                ApplicationManager.getApplication().invokeLater {
+                    loadingStates[tool.name] = false
+                    toolsList.repaint()
+                }
+            }
+        })
+    }
+
+    /**
+     * Fetches a page of Gradle versions and updates the display.
+     */
+    private fun fetchGradlePage(tool: ToolVersionsManager.Tool, url: String?) {
+        // Check if already loading
+        if (loadingStates[tool.name] == true) {
+            return
+        }
+
+        // Display loading state
+        versionsPanel.removeAll()
+        versionsPanel.add(JBLabel("Loading Gradle versions..."), BorderLayout.CENTER)
+        versionsPanel.revalidate()
+        versionsPanel.repaint()
+
+        loadingStates[tool.name] = true
+        toolsList.repaint()
+
+        val gradleService = tool.service as? GradleVersionsService
+        if (gradleService == null) {
+            loadingStates[tool.name] = false
+            versionsPanel.removeAll()
+            versionsPanel.add(JBLabel("Failed to load Gradle versions (service unavailable)"), BorderLayout.CENTER)
+            versionsPanel.revalidate()
+            versionsPanel.repaint()
+            toolsList.repaint()
+            return
+        }
+
+        ProgressManager.getInstance().run(object : Task.Backgroundable(project, "Loading Gradle Versions", true) {
+            private var result: GradleVersionsService.PaginatedResult? = null
+            private var error: Throwable? = null
+
+            override fun run(indicator: ProgressIndicator) {
+                indicator.text = "Fetching Gradle versions..."
+                indicator.isIndeterminate = true
+
+                try {
+                    runBlocking {
+                        withContext(Dispatchers.IO) {
+                            result = gradleService.fetchPage(url)
+                        }
+                    }
+                } catch (e: Exception) {
+                    error = e
+                }
+            }
+
+            override fun onSuccess() {
+                ApplicationManager.getApplication().invokeLater {
+                    loadingStates[tool.name] = false
+
+                    if (error != null || result == null) {
+                        logger.warn("Failed to load Gradle versions", error)
+                        versionsPanel.removeAll()
+                        versionsPanel.add(JBLabel("Failed to load Gradle versions"), BorderLayout.CENTER)
+                        versionsPanel.revalidate()
+                        versionsPanel.repaint()
+                    } else {
+                        val res = result!!
+                        if (res.errorMessage != null) {
+                            versionsPanel.removeAll()
+                            versionsPanel.add(JBLabel(res.errorMessage), BorderLayout.CENTER)
+                            versionsPanel.revalidate()
+                            versionsPanel.repaint()
+                            toolsList.repaint()
+                            return@invokeLater
+                        }
+                        gradlePrevUrl = res.prevUrl
+                        gradleNextUrl = res.nextUrl
+
+                        // Create a tool with the fetched versions
+                        val channel = VersionsService.VersionChannel(
+                            name = "All",
+                            description = "Gradle versions from GitHub releases",
+                            versions = res.versions
+                        )
+                        val updatedTool = ToolVersionsManager.Tool(tool.name, tool.service, listOf(channel))
+                        loadedTools[tool.name] = updatedTool
+                        updateVersionsDisplay(updatedTool)
+                    }
+
+                    toolsList.repaint()
+                }
+            }
+
             override fun onCancel() {
                 ApplicationManager.getApplication().invokeLater {
                     loadingStates[tool.name] = false
@@ -395,6 +500,33 @@ class ToolVersionsDialog(
         }
 
         panel.add(centerPanel, BorderLayout.CENTER)
+
+        // Add pagination buttons for Gradle
+        if (tool.name == "Gradle" && (gradlePrevUrl != null || gradleNextUrl != null)) {
+            val paginationPanel = JPanel(FlowLayout(FlowLayout.CENTER))
+            paginationPanel.border = JBUI.Borders.emptyTop(10)
+
+            val prevButton = JButton("← Previous")
+            prevButton.isEnabled = gradlePrevUrl != null
+            prevButton.addActionListener {
+                gradlePrevUrl?.let { url ->
+                    fetchGradlePage(tool, url)
+                }
+            }
+            paginationPanel.add(prevButton)
+
+            val nextButton = JButton("Next →")
+            nextButton.isEnabled = gradleNextUrl != null
+            nextButton.addActionListener {
+                gradleNextUrl?.let { url ->
+                    fetchGradlePage(tool, url)
+                }
+            }
+            paginationPanel.add(nextButton)
+
+            panel.add(paginationPanel, BorderLayout.SOUTH)
+        }
+
         return panel
     }
     
@@ -415,7 +547,10 @@ class ToolVersionsDialog(
         if (tool.name == "Dokka") {
             return false
         }
-        
+        if (tool.name == "Gradle") {
+            return false
+        }
+
         // Use columns for channels with many versions that can be grouped by major version
         return channel.versions.size > 10
     }

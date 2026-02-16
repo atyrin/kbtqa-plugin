@@ -28,8 +28,8 @@ For the project root directory:
 ## General actions
 
 ### Shows the latest tooling versions
-An action available in the `Tools` menu. It will show all available versions from maven repositories for different tools. 
-KGP from stable/dev and experimental channels. AGP from google repo. KSP and Dokka from maven central.
+An action available in the `Tools` menu. It will show all available versions from maven repositories for different tools.
+KGP from stable/dev and experimental channels. AGP from google repo. KSP and Dokka from maven central. Gradle versions from GitHub releases.
 
 
 # Installation and Updates

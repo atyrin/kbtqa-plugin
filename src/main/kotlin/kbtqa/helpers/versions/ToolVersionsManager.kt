@@ -36,7 +36,8 @@ class ToolVersionsManager {
             lazy { ApplicationManager.getApplication().service<KotlinVersionsService>() },
             lazy { ApplicationManager.getApplication().service<AndroidVersionsService>() },
             lazy { ApplicationManager.getApplication().service<KSPVersionsService>() },
-            lazy { ApplicationManager.getApplication().service<DokkaVersionsService>() }
+            lazy { ApplicationManager.getApplication().service<DokkaVersionsService>() },
+            lazy { ApplicationManager.getApplication().service<GradleVersionsService>() }
         )
     }
 
@@ -79,43 +80,4 @@ class ToolVersionsManager {
             Tool(tool.name, tool.service, emptyList())
         }
     }
-
-    /**
-     * Fetches versions for all available tools.
-     * Returns a list of Tool objects with their version channels loaded.
-     */
-    suspend fun getAllToolsWithVersions(): List<Tool> {
-        val tools = mutableListOf<Tool>()
-        val lazyServices = getAllVersionServices()
-        
-        for (lazyService in lazyServices) {
-            try {
-                // Lazy service is only instantiated here when .value is accessed
-                val service = lazyService.value
-                logger.info("Fetching versions for tool: ${service.toolName}")
-                val channels = service.getAllVersionChannels()
-                tools.add(Tool(service.toolName, service, channels))
-                logger.info("Successfully loaded ${channels.size} channels for ${service.toolName}")
-            } catch (e: Exception) {
-                // Service instantiation might fail, so handle it gracefully
-                val service = try {
-                    lazyService.value
-                } catch (serviceException: Exception) {
-                    logger.warn("Failed to instantiate service", serviceException)
-                    null
-                }
-                
-                val serviceName = service?.toolName ?: "Unknown Service"
-                logger.warn("Failed to load versions for $serviceName", e)
-                
-                // Add tool with empty channels in case of error (only if service could be instantiated)
-                if (service != null) {
-                    tools.add(Tool(service.toolName, service, emptyList()))
-                }
-            }
-        }
-        
-        return tools
-    }
-
 }
