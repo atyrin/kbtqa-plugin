@@ -19,42 +19,59 @@ abstract class BaseVersionsService : VersionsService {
 
     companion object {
         private const val REQUEST_TIMEOUT_SECONDS = 30L
+        private val httpClient = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(REQUEST_TIMEOUT_SECONDS))
+            .build()
     }
 
     protected val logger = thisLogger()
 
     /**
-     * Fetches versions from a Maven repository URL.
+     * Sends an HTTP GET request and returns the response, or null on failure.
      */
-    protected suspend fun getVersionsFromUrl(url: String): List<String> {
+    protected suspend fun fetchHttpResponse(
+        url: String,
+        headers: Map<String, String> = emptyMap()
+    ): HttpResponse<String>? {
         return try {
-            logger.warn("Fetching versions from: $url")
+            logger.info("Fetching from: $url")
 
-            val client = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(REQUEST_TIMEOUT_SECONDS))
-                .build()
-
-            val request = HttpRequest.newBuilder()
+            val requestBuilder = HttpRequest.newBuilder()
                 .uri(URI.create(url))
                 .timeout(Duration.ofSeconds(REQUEST_TIMEOUT_SECONDS))
                 .GET()
-                .build()
 
-            val response = withContext(Dispatchers.IO) { client.send(request, HttpResponse.BodyHandlers.ofString()) }
+            for ((key, value) in headers) {
+                requestBuilder.header(key, value)
+            }
+
+            val request = requestBuilder.build()
+
+            val response = withContext(Dispatchers.IO) {
+                httpClient.send(request, HttpResponse.BodyHandlers.ofString())
+            }
 
             if (response.statusCode() == 200) {
-                parseVersionsFromXml(response.body())
+                response
             } else {
-                logger.warn("Failed to fetch versions from $url: HTTP ${response.statusCode()}")
-                emptyList()
+                logger.warn("HTTP request failed for $url: HTTP ${response.statusCode()}")
+                null
             }
         } catch (e: IOException) {
-            logger.warn("IO error while fetching versions from $url", e)
-            emptyList()
+            logger.warn("IO error while fetching from $url", e)
+            null
         } catch (e: Exception) {
-            logger.warn("Unexpected error while fetching versions from $url", e)
-            emptyList()
+            logger.warn("Unexpected error while fetching from $url", e)
+            null
         }
+    }
+
+    /**
+     * Fetches versions from a Maven repository URL.
+     */
+    protected suspend fun getVersionsFromUrl(url: String): List<String> {
+        val response = fetchHttpResponse(url) ?: return emptyList()
+        return parseVersionsFromXml(response.body())
     }
 
     /**

@@ -21,8 +21,18 @@ class KotlinVersionsService : BaseVersionsService() {
      */
     override suspend fun getAllVersionChannels(): List<VersionsService.VersionChannel> {
         return listOf(
-            VersionsService.VersionChannel("Dev", "Development versions from JetBrains repository", getVersionsFromUrl(DEV_REPO_URL)),
-            VersionsService.VersionChannel("Experimental", "Experimental versions from JetBrains repository", getVersionsFromUrl(EXPERIMENTAL_REPO_URL)),
+            VersionsService.VersionChannel(
+                "Dev", "Development versions from JetBrains repository",
+                getVersionsFromUrl(DEV_REPO_URL),
+                repositoryUrl = "https://redirector.kotlinlang.org/maven/dev",
+                useColumnsLayout = true
+            ),
+            VersionsService.VersionChannel(
+                "Experimental", "Experimental versions from JetBrains repository",
+                getVersionsFromUrl(EXPERIMENTAL_REPO_URL),
+                repositoryUrl = "https://redirector.kotlinlang.org/maven/experimental",
+                useColumnsLayout = true
+            ),
             VersionsService.VersionChannel("Stable", "Stable releases from Maven Central", getVersionsFromUrl(STABLE_REPO_URL))
         )
     }

@@ -24,12 +24,14 @@ class DokkaVersionsService : BaseVersionsService() {
             VersionsService.VersionChannel(
                 "Dev",
                 "Development versions from JetBrains repository",
-                getVersionsFromUrl(DEV_REPO_URL)
+                getVersionsFromUrl(DEV_REPO_URL),
+                repositoryUrl = "https://redirector.kotlinlang.org/maven/dokka-dev"
             ),
             VersionsService.VersionChannel(
                 "Test",
                 "Test versions from JetBrains repository",
-                getVersionsFromUrl(TEST_REPO_URL)
+                getVersionsFromUrl(TEST_REPO_URL),
+                repositoryUrl = "https://redirector.kotlinlang.org/maven/dokka-test"
             ),
             VersionsService.VersionChannel(
                 "Stable",

@@ -23,11 +23,6 @@ import java.awt.event.KeyAdapter
 import java.awt.event.KeyEvent
 import javax.swing.event.DocumentEvent
 import javax.swing.event.DocumentListener
-import com.intellij.openapi.progress.ProgressIndicator
-import com.intellij.openapi.progress.ProgressManager
-import com.intellij.openapi.progress.Task
-import com.intellij.openapi.application.ApplicationManager
-import kotlinx.coroutines.*
 
 /**
  * Dialog that displays available versions for different tools.
@@ -47,45 +42,38 @@ class ToolVersionsDialog(
     private var searchField: SearchTextField? = null
     private var currentFilter: String = ""
 
-    // Track loaded tools and loading states
-    private val loadedTools = mutableMapOf<String, ToolVersionsManager.Tool>()
-    private val loadingStates = mutableMapOf<String, Boolean>()
-    private val toolsManager = ToolVersionsManager.getInstance()
-
-    // Gradle pagination state
-    private var gradlePrevUrl: String? = null
-    private var gradleNextUrl: String? = null
+    private val loadingController = VersionLoadingController(project, ToolVersionsManager.getInstance())
 
     init {
         title = "Tool Versions"
         setResizable(true)
         init()
     }
-    
+
     override fun createCenterPanel(): JComponent {
         val mainPanel = JPanel(BorderLayout())
-        
+
         if (tools.isEmpty()) {
             mainPanel.add(JBLabel("Failed to load tool versions. Please check your internet connection."), BorderLayout.CENTER)
             return mainPanel
         }
-        
+
         // Initialize versionsPanel first to avoid lateinit access issues
         versionsPanel = JPanel(BorderLayout())
         versionsPanel.border = JBUI.Borders.empty(0, 5, 0, 0)
-        
+
         // Create modern splitter with tools on the left and versions on the right
         val splitter = JBSplitter(false, 0.2f)
         splitter.firstComponent = createToolsPanel()
         splitter.secondComponent = createVersionsPanel()
 
         mainPanel.add(splitter, BorderLayout.CENTER)
-        
+
         // Add instructions at the bottom
         val instructionsLabel = JBLabel("<html><i>Select a tool on the left. Use the search field to filter versions. Double-click or press Enter to copy a version.</i></html>")
         instructionsLabel.border = JBUI.Borders.empty(10, 0, 0, 0)
         mainPanel.add(instructionsLabel, BorderLayout.SOUTH)
-        
+
         mainPanel.preferredSize = Dimension(800, 500)
 
         // Auto-select Kotlin and load versions by default (fallback to first tool)
@@ -100,7 +88,6 @@ class ToolVersionsDialog(
                 if (indexToSelect >= 0) {
                     toolsList.selectedIndex = indexToSelect
                     toolsList.ensureIndexIsVisible(indexToSelect)
-                    // Selection listener will trigger version loading
                 }
             } catch (_: Exception) {
                 // Ignore any errors during auto-selection to avoid breaking dialog
@@ -109,18 +96,18 @@ class ToolVersionsDialog(
 
         return mainPanel
     }
-    
+
     /**
      * Creates the left panel with tools list.
      */
     private fun createToolsPanel(): JComponent {
         val panel = JPanel(BorderLayout())
         panel.border = JBUI.Borders.empty(0, 0, 0, 5)
-        
+
         // Header
         val header = TitledSeparator("Tools")
         panel.add(header, BorderLayout.NORTH)
-        
+
         // Create tools list
         toolsList = JBList(CollectionListModel(tools))
         toolsList.selectionMode = ListSelectionModel.SINGLE_SELECTION
@@ -136,11 +123,11 @@ class ToolVersionsDialog(
                     append(value.name)
                     append("  ")
                     when {
-                        loadingStates[value.name] == true -> {
+                        loadingController.isLoading(value.name) -> {
                             append("(Loading...)", SimpleTextAttributes.GRAYED_ITALIC_ATTRIBUTES)
                         }
-                        loadedTools.containsKey(value.name) -> {
-                            val loadedTool = loadedTools[value.name]!!
+                        loadingController.getLoadedTool(value.name) != null -> {
+                            val loadedTool = loadingController.getLoadedTool(value.name)!!
                             append("(${getTotalVersionsCount(loadedTool)} versions)", SimpleTextAttributes.GRAYED_ATTRIBUTES)
                         }
                         else -> {
@@ -150,32 +137,29 @@ class ToolVersionsDialog(
                 }
             }
         }
-        
+
         // Add selection listener
         toolsList.addListSelectionListener { e ->
             if (!e.valueIsAdjusting) {
                 val selectedTool = toolsList.selectedValue
                 if (selectedTool != null) {
-                    updateVersionsDisplayAsync(selectedTool)
+                    onToolSelected(selectedTool)
                 }
             }
         }
-        
+
         val scrollPane = JBScrollPane(toolsList)
         scrollPane.border = JBUI.Borders.empty()
         scrollPane.viewportBorder = JBUI.Borders.empty()
         panel.add(scrollPane, BorderLayout.CENTER)
-        
+
         return panel
     }
-    
+
     /**
      * Creates the right panel for displaying versions.
      */
     private fun createVersionsPanel(): JComponent {
-        // versionsPanel is now pre-initialized in createCenterPanel()
-        
-        // Show instruction to select a tool instead of automatically loading first tool
         if (tools.isNotEmpty()) {
             val instructionLabel = JBLabel("<html><center>Select a tool from the list to view available versions.<br/>Versions will be loaded on-demand.</center></html>")
             instructionLabel.horizontalAlignment = SwingConstants.CENTER
@@ -183,186 +167,39 @@ class ToolVersionsDialog(
         } else {
             versionsPanel.add(JBLabel("No tools available."), BorderLayout.CENTER)
         }
-        
+
         return versionsPanel
     }
-    
-    /**
-     * Updates the versions display for the selected tool, fetching versions if needed.
-     */
-    private fun updateVersionsDisplayAsync(tool: ToolVersionsManager.Tool) {
-        // For Gradle, use paginated loading
-        if (tool.name == "Gradle") {
-            fetchGradlePage(tool, null)
-            return
-        }
 
-        // Check if we already have this tool with loaded versions
-        val loadedTool = loadedTools[tool.name]
-        if (loadedTool != null) {
-            // Already loaded, display immediately
+    /**
+     * Handles tool selection — delegates to the loading controller.
+     */
+    private fun onToolSelected(tool: ToolVersionsManager.Tool) {
+        // Check if already loaded (for non-paginated tools)
+        val loadedTool = loadingController.getLoadedTool(tool.name)
+        if (loadedTool != null && tool.service !is PaginatedVersionsService) {
             updateVersionsDisplay(loadedTool)
             return
         }
 
-        // Check if already loading
-        if (loadingStates[tool.name] == true) {
-            return
-        }
-
-        // Display loading state
+        // Show loading state in versions panel
         versionsPanel.removeAll()
         versionsPanel.add(JBLabel("Loading versions for ${tool.name}..."), BorderLayout.CENTER)
         versionsPanel.revalidate()
         versionsPanel.repaint()
-
-        // Update loading state and refresh tool list
-        loadingStates[tool.name] = true
         toolsList.repaint()
 
-        // Fetch versions in background
-        ProgressManager.getInstance().run(object : Task.Backgroundable(project, "Loading ${tool.name} Versions", true) {
-            private var updatedTool: ToolVersionsManager.Tool? = null
-            private var error: Throwable? = null
-
-            override fun run(indicator: ProgressIndicator) {
-                indicator.text = "Fetching ${tool.name} versions..."
-                indicator.isIndeterminate = true
-
-                try {
-                    runBlocking {
-                        withContext(Dispatchers.IO) {
-                            updatedTool = toolsManager.fetchVersionsForTool(tool)
-                        }
-                    }
-                } catch (e: Exception) {
-                    error = e
-                }
-            }
-
-            override fun onSuccess() {
-                ApplicationManager.getApplication().invokeLater {
-                    loadingStates[tool.name] = false
-
-                    if (error != null) {
-                        logger.warn("Failed to load versions for ${tool.name}", error)
-                        versionsPanel.removeAll()
-                        versionsPanel.add(JBLabel("Failed to load versions for ${tool.name}"), BorderLayout.CENTER)
-                        versionsPanel.revalidate()
-                        versionsPanel.repaint()
-                    } else if (updatedTool != null) {
-                        // Store loaded tool and update display
-                        loadedTools[tool.name] = updatedTool!!
-                        updateVersionsDisplay(updatedTool!!)
-                    }
-
-                    // Refresh tool list to update status
-                    toolsList.repaint()
-                }
-            }
-
-            override fun onCancel() {
-                ApplicationManager.getApplication().invokeLater {
-                    loadingStates[tool.name] = false
-                    toolsList.repaint()
-                }
-            }
-        })
-    }
-
-    /**
-     * Fetches a page of Gradle versions and updates the display.
-     */
-    private fun fetchGradlePage(tool: ToolVersionsManager.Tool, url: String?) {
-        // Check if already loading
-        if (loadingStates[tool.name] == true) {
-            return
-        }
-
-        // Display loading state
-        versionsPanel.removeAll()
-        versionsPanel.add(JBLabel("Loading Gradle versions..."), BorderLayout.CENTER)
-        versionsPanel.revalidate()
-        versionsPanel.repaint()
-
-        loadingStates[tool.name] = true
-        toolsList.repaint()
-
-        val gradleService = tool.service as? GradleVersionsService
-        if (gradleService == null) {
-            loadingStates[tool.name] = false
-            versionsPanel.removeAll()
-            versionsPanel.add(JBLabel("Failed to load Gradle versions (service unavailable)"), BorderLayout.CENTER)
-            versionsPanel.revalidate()
-            versionsPanel.repaint()
-            toolsList.repaint()
-            return
-        }
-
-        ProgressManager.getInstance().run(object : Task.Backgroundable(project, "Loading Gradle Versions", true) {
-            private var result: GradleVersionsService.PaginatedResult? = null
-            private var error: Throwable? = null
-
-            override fun run(indicator: ProgressIndicator) {
-                indicator.text = "Fetching Gradle versions..."
-                indicator.isIndeterminate = true
-
-                try {
-                    runBlocking {
-                        withContext(Dispatchers.IO) {
-                            result = gradleService.fetchPage(url)
-                        }
-                    }
-                } catch (e: Exception) {
-                    error = e
-                }
-            }
-
-            override fun onSuccess() {
-                ApplicationManager.getApplication().invokeLater {
-                    loadingStates[tool.name] = false
-
-                    if (error != null || result == null) {
-                        logger.warn("Failed to load Gradle versions", error)
-                        versionsPanel.removeAll()
-                        versionsPanel.add(JBLabel("Failed to load Gradle versions"), BorderLayout.CENTER)
-                        versionsPanel.revalidate()
-                        versionsPanel.repaint()
-                    } else {
-                        val res = result!!
-                        if (res.errorMessage != null) {
-                            versionsPanel.removeAll()
-                            versionsPanel.add(JBLabel(res.errorMessage), BorderLayout.CENTER)
-                            versionsPanel.revalidate()
-                            versionsPanel.repaint()
-                            toolsList.repaint()
-                            return@invokeLater
-                        }
-                        gradlePrevUrl = res.prevUrl
-                        gradleNextUrl = res.nextUrl
-
-                        // Create a tool with the fetched versions
-                        val channel = VersionsService.VersionChannel(
-                            name = "All",
-                            description = "Gradle versions from GitHub releases",
-                            versions = res.versions
-                        )
-                        val updatedTool = ToolVersionsManager.Tool(tool.name, tool.service, listOf(channel))
-                        loadedTools[tool.name] = updatedTool
-                        updateVersionsDisplay(updatedTool)
-                    }
-
-                    toolsList.repaint()
-                }
-            }
-
-            override fun onCancel() {
-                ApplicationManager.getApplication().invokeLater {
-                    loadingStates[tool.name] = false
-                    toolsList.repaint()
-                }
-            }
-        })
+        loadingController.loadTool(
+            tool,
+            onSuccess = { updatedTool -> updateVersionsDisplay(updatedTool) },
+            onError = { message ->
+                versionsPanel.removeAll()
+                versionsPanel.add(JBLabel(message), BorderLayout.CENTER)
+                versionsPanel.revalidate()
+                versionsPanel.repaint()
+            },
+            onComplete = { toolsList.repaint() }
+        )
     }
 
     /**
@@ -385,15 +222,12 @@ class ToolVersionsDialog(
             private fun onChange() {
                 val newText = sf.text.trim()
                 if (newText != currentFilter) {
-                    // Save caret position before rebuilding UI
                     val caretPos = try { sf.textEditor.caretPosition } catch (e: Exception) { newText.length }
                     currentFilter = newText
                     currentTool?.let { updateVersionsDisplay(it) }
-                    // Restore focus and caret to the new search field after UI rebuild
                     javax.swing.SwingUtilities.invokeLater {
                         searchField?.let { newSf ->
                             newSf.requestFocusInWindow()
-                            // Ensure the text matches currentFilter (no-op if same)
                             if (newSf.text != currentFilter) newSf.text = currentFilter
                             val endPos = newSf.text.length
                             try { newSf.textEditor.caretPosition = endPos } catch (_: Exception) {}
@@ -420,27 +254,23 @@ class ToolVersionsDialog(
         versionsPanel.revalidate()
         versionsPanel.repaint()
     }
-    
+
     /**
      * Creates the versions display component for a tool.
      */
     private fun createVersionsDisplay(tool: ToolVersionsManager.Tool): JComponent {
         if (tool.channels.size == 1) {
-            // Single channel - reuse channel panel (with description and proper layout)
             return createChannelPanel(tool.channels.first(), tool)
         } else {
-            // Multiple channels - show as tabbed pane
             val tabbedPane = JBTabbedPane()
-            
             for (channel in tool.channels) {
                 val tabPanel = createChannelPanel(channel, tool)
                 tabbedPane.addTab(channel.name, tabPanel)
             }
-            
             return tabbedPane
         }
     }
-    
+
     /**
      * Creates a panel for a specific version channel.
      */
@@ -460,26 +290,10 @@ class ToolVersionsDialog(
         headerPanel.border = JBUI.Borders.emptyBottom(10)
         headerPanel.add(descriptionLabel, BorderLayout.WEST)
 
-        // Add Copy repository button for Kotlin Dev/Experimental and Dokka Dev/Test channels
-        if (tool.name == "Kotlin" && (channel.name.equals("Dev", ignoreCase = true) || channel.name.equals("Experimental", ignoreCase = true))) {
+        // Add Copy repository button if the channel has a repository URL
+        channel.repositoryUrl?.let { repoUrl ->
             val copyButton = JButton("Copy repository")
             copyButton.addActionListener {
-                val repoUrl = if (channel.name.equals("Dev", ignoreCase = true)) {
-                    "https://redirector.kotlinlang.org/maven/dev"
-                } else {
-                    "https://redirector.kotlinlang.org/maven/experimental"
-                }
-                copyVersionToClipboard(repoUrl, itemType = "Repository")
-            }
-            headerPanel.add(copyButton, BorderLayout.EAST)
-        } else if (tool.name == "Dokka" && (channel.name.equals("Dev", ignoreCase = true) || channel.name.equals("Test", ignoreCase = true))) {
-            val copyButton = JButton("Copy repository")
-            copyButton.addActionListener {
-                val repoUrl = if (channel.name.equals("Dev", ignoreCase = true)) {
-                    "https://redirector.kotlinlang.org/maven/dokka-dev"
-                } else {
-                    "https://redirector.kotlinlang.org/maven/dokka-test"
-                }
                 copyVersionToClipboard(repoUrl, itemType = "Repository")
             }
             headerPanel.add(copyButton, BorderLayout.EAST)
@@ -492,8 +306,8 @@ class ToolVersionsDialog(
             return panel
         }
 
-        // Use column layout for appropriate channels, single list for others
-        val centerPanel = if (shouldUseColumnsLayout(channel, tool)) {
+        // Use column layout based on channel metadata
+        val centerPanel = if (channel.useColumnsLayout && channel.versions.size > 10) {
             createColumnsPanel(filtered)
         } else {
             createSingleListPanel(filtered)
@@ -501,60 +315,61 @@ class ToolVersionsDialog(
 
         panel.add(centerPanel, BorderLayout.CENTER)
 
-        // Add pagination buttons for Gradle
-        if (tool.name == "Gradle" && (gradlePrevUrl != null || gradleNextUrl != null)) {
-            val paginationPanel = JPanel(FlowLayout(FlowLayout.CENTER))
-            paginationPanel.border = JBUI.Borders.emptyTop(10)
+        // Add pagination buttons if this is a paginated tool
+        if (tool.service is PaginatedVersionsService) {
+            val paginationState = loadingController.getPaginationState(tool.name)
+            if (paginationState != null && (paginationState.prevUrl != null || paginationState.nextUrl != null)) {
+                val paginationPanel = JPanel(FlowLayout(FlowLayout.CENTER))
+                paginationPanel.border = JBUI.Borders.emptyTop(10)
 
-            val prevButton = JButton("← Previous")
-            prevButton.isEnabled = gradlePrevUrl != null
-            prevButton.addActionListener {
-                gradlePrevUrl?.let { url ->
-                    fetchGradlePage(tool, url)
+                val prevButton = JButton("← Previous")
+                prevButton.isEnabled = paginationState.prevUrl != null
+                prevButton.addActionListener {
+                    paginationState.prevUrl?.let { url ->
+                        loadPaginatedPage(tool, url)
+                    }
                 }
-            }
-            paginationPanel.add(prevButton)
+                paginationPanel.add(prevButton)
 
-            val nextButton = JButton("Next →")
-            nextButton.isEnabled = gradleNextUrl != null
-            nextButton.addActionListener {
-                gradleNextUrl?.let { url ->
-                    fetchGradlePage(tool, url)
+                val nextButton = JButton("Next →")
+                nextButton.isEnabled = paginationState.nextUrl != null
+                nextButton.addActionListener {
+                    paginationState.nextUrl?.let { url ->
+                        loadPaginatedPage(tool, url)
+                    }
                 }
-            }
-            paginationPanel.add(nextButton)
+                paginationPanel.add(nextButton)
 
-            panel.add(paginationPanel, BorderLayout.SOUTH)
+                panel.add(paginationPanel, BorderLayout.SOUTH)
+            }
         }
 
         return panel
     }
-    
-    /**
-     * Determines if a channel should use columns layout based on tool and channel characteristics.
-     */
-    private fun shouldUseColumnsLayout(channel: VersionsService.VersionChannel, tool: ToolVersionsManager.Tool): Boolean {
-        // Do not apply grouping to Android, Kotlin stable channels, KSP, and Dokka (all channels)
-        if (tool.name == "Kotlin" && channel.name == "Stable") {
-            return false
-        }
-        if (tool.name == "Android" && channel.name == "All") {
-            return false
-        }
-        if (tool.name == "KSP") {
-            return false
-        }
-        if (tool.name == "Dokka") {
-            return false
-        }
-        if (tool.name == "Gradle") {
-            return false
-        }
 
-        // Use columns for channels with many versions that can be grouped by major version
-        return channel.versions.size > 10
+    /**
+     * Loads a specific page for a paginated tool.
+     */
+    private fun loadPaginatedPage(tool: ToolVersionsManager.Tool, url: String) {
+        versionsPanel.removeAll()
+        versionsPanel.add(JBLabel("Loading ${tool.name} versions..."), BorderLayout.CENTER)
+        versionsPanel.revalidate()
+        versionsPanel.repaint()
+        toolsList.repaint()
+
+        loadingController.loadPaginatedPage(
+            tool, url,
+            onSuccess = { updatedTool -> updateVersionsDisplay(updatedTool) },
+            onError = { message ->
+                versionsPanel.removeAll()
+                versionsPanel.add(JBLabel(message), BorderLayout.CENTER)
+                versionsPanel.revalidate()
+                versionsPanel.repaint()
+            },
+            onComplete = { toolsList.repaint() }
+        )
     }
-    
+
     /**
      * Creates a single list panel (used for channels with fewer versions)
      */
@@ -581,12 +396,10 @@ class ToolVersionsDialog(
         for ((majorVersion, versionList) in groupedVersions) {
             val columnPanel = JPanel(BorderLayout())
 
-            // Add header for the column
             val headerLabel = JBLabel("<html><b>Version ${majorVersion}.x</b></html>")
             headerLabel.border = JBUI.Borders.emptyBottom(5)
             columnPanel.add(headerLabel, BorderLayout.NORTH)
 
-            // Create list for this major version group
             val versionJBList = createVersionList(versionList)
 
             val scrollPane = JBScrollPane(versionJBList).apply {
@@ -600,7 +413,7 @@ class ToolVersionsDialog(
 
         return columnsPanel
     }
-    
+
     /**
      * Creates a version list with proper interaction listeners.
      */
@@ -615,40 +428,35 @@ class ToolVersionsDialog(
         return versionList
     }
 
-    
     /**
      * Adds mouse and keyboard listeners for version interaction.
      */
     private fun addListInteractionListeners(versionList: JBList<String>) {
-        // Double-click to copy
         versionList.addMouseListener(object : MouseAdapter() {
             override fun mouseClicked(e: MouseEvent) {
                 if (e.clickCount == 2) {
-                    val selectedVersion = versionList.selectedValue
-                    selectedVersion?.let { version ->
+                    versionList.selectedValue?.let { version ->
                         copyVersionToClipboard(version)
                     }
                 }
             }
         })
-        
-        // Enter key to copy
+
         versionList.addKeyListener(object : KeyAdapter() {
             override fun keyPressed(e: KeyEvent) {
                 if (e.keyCode == KeyEvent.VK_ENTER) {
-                    val selectedVersion = versionList.selectedValue
-                    selectedVersion?.let { version ->
+                    versionList.selectedValue?.let { version ->
                         copyVersionToClipboard(version)
                     }
                 }
             }
         })
     }
-    
+
     /**
      * Extracts the major version from a version string.
      * For version "2.3.1", returns "2.3"
-     * For version "1.9.20", returns "1.9" 
+     * For version "1.9.20", returns "1.9"
      */
     private fun extractMajorVersion(version: String): String {
         val parts = version.split(".")
@@ -658,7 +466,7 @@ class ToolVersionsDialog(
             parts.firstOrNull() ?: version
         }
     }
-    
+
     /**
      * Groups versions by their major version and returns them sorted by major version
      */
@@ -666,11 +474,9 @@ class ToolVersionsDialog(
         return versions
             .groupBy { extractMajorVersion(it) }
             .toSortedMap { v1, v2 ->
-                // Simple major version comparison - compare as version strings
                 val parts1 = v1.split(".").map { it.toIntOrNull() ?: 0 }
                 val parts2 = v2.split(".").map { it.toIntOrNull() ?: 0 }
-                
-                // Compare major version (first part), then minor (second part)
+
                 val majorComparison = (parts2.getOrElse(0) { 0 }).compareTo(parts1.getOrElse(0) { 0 })
                 if (majorComparison != 0) {
                     majorComparison
@@ -686,7 +492,7 @@ class ToolVersionsDialog(
     private fun getTotalVersionsCount(tool: ToolVersionsManager.Tool): Int {
         return tool.channels.sumOf { it.versions.size }
     }
-    
+
     /**
      * Copies text to clipboard and shows notification.
      */
@@ -695,10 +501,9 @@ class ToolVersionsDialog(
             val clipboard = Toolkit.getDefaultToolkit().systemClipboard
             val stringSelection = StringSelection(text)
             clipboard.setContents(stringSelection, null)
-            
+
             logger.info("$itemType copied to clipboard: $text")
-            
-            // Show notification
+
             NotificationGroupManager.getInstance()
                 .getNotificationGroup("Tool Versions")
                 .createNotification("$itemType '$text' has been copied to clipboard", NotificationType.INFORMATION)
@@ -707,7 +512,7 @@ class ToolVersionsDialog(
             logger.warn("Failed to copy $itemType to clipboard", e)
         }
     }
-    
+
     override fun createActions(): Array<Action> {
         return arrayOf(cancelAction)
     }
