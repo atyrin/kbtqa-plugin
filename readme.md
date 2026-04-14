@@ -31,6 +31,15 @@ For the project root directory:
 An action available in the `Tools` menu. It will show all available versions from maven repositories for different tools.
 KGP from stable/dev and experimental channels. AGP from google repo. KSP and Dokka from maven central. Gradle versions from GitHub releases.
 
+### Skills Setup Wizard
+An action available in the `Tools` menu. It opens a dialog that lets you browse AI agent skill repositories, select skills, and install them into your project. Works with any git repository (GitHub, GitLab, internal repos, etc.).
+
+* **Repositories panel** (left): shows configured skill repositories. Use `+`/`−` buttons to add or remove repositories. Each repository specifies a git URL and the path to the skills directory within the repo.
+* **Skills panel** (center): displays available skills as checkboxes, fetched from the selected repository via git clone.
+* **Target directory** (bottom): specify where skills are installed (default: `.junie/skills`). Change to `.claude/skills` or any other path as needed.
+* Click **Install** to clone the repository and copy the selected skill folders into your project.
+* Default repository: [Kotlin/kotlin-agent-skills](https://github.com/Kotlin/kotlin-agent-skills) (skills path: `skills`).
+
 
 # Installation and Updates
 

@@ -30,6 +30,7 @@ dependencies {
         // Add necessary plugin dependencies for compilation here, example:
         // bundledPlugin("com.intellij.java")
         bundledPlugin("org.jetbrains.kotlin")
+        bundledPlugin("Git4Idea")
     }
 }
 
@@ -41,7 +42,7 @@ intellijPlatform {
         }
 
         changeNotes = """
-      Add project cleanup and compress (1.4.0)
+      Add skills wizard (1.5.0)
     """.trimIndent()
         description = project.file("src/main/resources/description.html").readText()
     }
