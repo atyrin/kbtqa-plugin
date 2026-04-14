@@ -2,8 +2,8 @@ import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
 
 plugins {
     id("java")
-    id("org.jetbrains.kotlin.jvm") version "2.3.20-Beta2"
-    id("org.jetbrains.intellij.platform") version "2.11.0"
+    id("org.jetbrains.kotlin.jvm") version "2.4.0-Beta1"
+    id("org.jetbrains.intellij.platform") version "2.14.0"
 }
 
 repositories {

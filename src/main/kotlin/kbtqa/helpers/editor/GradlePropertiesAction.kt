@@ -42,6 +42,7 @@ class GradlePropertiesAction : AnAction("Add Gradle Property", "Insert a Gradle 
             PropertyItem.Entry("kotlin.internal.kmp.enableUKlibs=true"),
             PropertyItem.Entry("kotlin.stdlib.default.dependency=false"),
             PropertyItem.Entry("kotlin.mpp.enableCInteropCommonization=true"),
+            PropertyItem.Entry("kotlin.disableSwiftPMImport=true"),
             PropertyItem.Separator,
             PropertyItem.Entry("org.gradle.unsafe.isolated-projects=true"),
             PropertyItem.Entry("org.gradle.configuration-cache=true"),
