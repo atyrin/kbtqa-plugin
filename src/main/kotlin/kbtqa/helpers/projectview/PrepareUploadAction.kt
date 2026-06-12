@@ -1,17 +1,18 @@
 package kbtqa.helpers.projectview
 
+import com.intellij.ide.actions.RevealFileAction
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.vfs.LocalFileSystem
-import java.awt.Desktop
 import java.io.File
 import java.io.FileOutputStream
 import java.nio.file.Files
@@ -26,7 +27,7 @@ import java.util.zip.ZipOutputStream
  * This action performs the following steps:
  * 1. Creates a zip archive of the project, excluding cache folders (.gradle, .kotlin, .idea, build)
  *    and items matched by the project's .gitignore rules
- * 2. Opens the zip file location in Finder (macOS) or Windows Explorer
+ * 2. Reveals the zip file in the system file manager (Finder, Windows Explorer, etc.)
  * 
  * Note: Cache folders are excluded from the zip but remain in their original location.
  */
@@ -37,23 +38,13 @@ class PrepareUploadAction :
     override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.BGT
 
     override fun update(e: AnActionEvent) {
-        val project = e.project
+        val basePath = e.project?.basePath
         val selectedFile = e.getData(CommonDataKeys.VIRTUAL_FILE)
-        
-        // Check if we have a valid project
-        val hasProject = project != null && project.basePath != null
-        
-        // Check if this is being invoked from project view context (has selected file)
-        val isProjectViewContext = selectedFile != null
-        
-        // In project view context, only show when project root is selected
-        // In other contexts (like Tools menu), show when a project is open
-        val isProjectRoot = hasProject && selectedFile?.path == project.basePath
-        
-        val shouldShow = if (isProjectViewContext) isProjectRoot else hasProject
-        
-        e.presentation.isVisible = shouldShow
-        e.presentation.isEnabled = shouldShow
+
+        // In project view context (a file is selected), only show when the project root is selected.
+        // In other contexts (like Tools menu), show whenever a project is open.
+        e.presentation.isEnabledAndVisible =
+            basePath != null && (selectedFile == null || selectedFile.path == basePath)
     }
 
     override fun actionPerformed(e: AnActionEvent) {
@@ -78,7 +69,7 @@ class PrepareUploadAction :
         
         val selectedExclusions = dialog.getSelectedExclusions()
 
-        ProgressManager.getInstance().run(object : Task.Backgroundable(project, "Preparing Project for Upload", true, ALWAYS_BACKGROUND) {
+        ProgressManager.getInstance().run(object : Task.Backgroundable(project, "Preparing Project for Upload", true) {
             override fun run(indicator: ProgressIndicator) {
                 try {
                     indicator.isIndeterminate = false
@@ -93,7 +84,7 @@ class PrepareUploadAction :
                         return
                     }
                     
-                    // Step 2: Refresh VFS and open in file explorer
+                    // Step 2: Refresh VFS and reveal the file in the system file manager
                     indicator.text = "Opening file location..."
                     indicator.fraction = 0.9
 
@@ -101,11 +92,13 @@ class PrepareUploadAction :
                     LocalFileSystem.getInstance().refreshAndFindFileByIoFile(zipFile)
 
                     ApplicationManager.getApplication().invokeLater {
-                        // Open the zip file location in file explorer
-                        openInFileExplorer(zipFile)
+                        // Reveal the zip file in the system file manager
+                        RevealFileAction.openFile(zipFile)
                     }
                     
                     indicator.fraction = 1.0
+                } catch (pce: ProcessCanceledException) {
+                    throw pce
                 } catch (ex: Exception) {
                     ApplicationManager.getApplication().invokeLater {
                         Messages.showErrorDialog(
@@ -134,7 +127,10 @@ class PrepareUploadAction :
         if (zipFile.exists()) {
             val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
             val oldZipFile = File(projectDir.parentFile, "${projectName}_old_${timestamp}.zip")
-            zipFile.renameTo(oldZipFile)
+            if (!zipFile.renameTo(oldZipFile)) {
+                // Fall back to overwriting the existing archive if the rename failed
+                zipFile.delete()
+            }
         }
         
         // Collect all files to zip (excluding selected folders)
@@ -178,57 +174,14 @@ class PrepareUploadAction :
         if (!dir.isDirectory) return
         
         dir.listFiles()?.forEach { file ->
-            // Calculate relative path for exclusion check
+            // Calculate relative path for exclusion check (applies to both directories and files)
             val relativePath = file.relativeTo(projectRoot).path
-            val shouldExclude = excludedPaths.contains(relativePath)
+            if (relativePath in excludedPaths) return@forEach
             
+            result.add(file)
             if (file.isDirectory) {
-                if (!shouldExclude) {
-                    result.add(file)
-                    collectFilesToZip(projectRoot, file, excludedPaths, result)
-                }
-            } else {
-                // Also check file exclusions
-                if (!shouldExclude) {
-                    result.add(file)
-                }
+                collectFilesToZip(projectRoot, file, excludedPaths, result)
             }
-        }
-    }
-
-    /**
-     * Opens the file's parent directory in the system file explorer and selects the file.
-     */
-    private fun openInFileExplorer(file: File) {
-        try {
-            val os = System.getProperty("os.name").lowercase()
-            when {
-                os.contains("mac") -> {
-                    // macOS: Use 'open -R' to reveal the file in Finder
-                    Runtime.getRuntime().exec(arrayOf("open", "-R", file.absolutePath))
-                }
-                os.contains("win") -> {
-                    // Windows: Use 'explorer /select,' to open Explorer and select the file
-                    Runtime.getRuntime().exec(arrayOf("explorer", "/select,", file.absolutePath))
-                }
-                os.contains("linux") -> {
-                    // Linux: Try to open the parent directory with xdg-open
-                    if (Desktop.isDesktopSupported()) {
-                        Desktop.getDesktop().open(file.parentFile)
-                    } else {
-                        Runtime.getRuntime().exec(arrayOf("xdg-open", file.parentFile.absolutePath))
-                    }
-                }
-                else -> {
-                    // Fallback: Try Desktop API
-                    if (Desktop.isDesktopSupported()) {
-                        Desktop.getDesktop().open(file.parentFile)
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            // Silently ignore if we can't open the file explorer
-            // The user will still see the success message with the file path
         }
     }
 }
