@@ -23,7 +23,12 @@ For `gradle` directory in the file tree:
 
 For the project root directory:
 * Delete `.gradle`, `.kotlin`, `.idea`, `.git` and `build` directories. Also `local.properties` file. The full will be shown in the popup. 
-* Create a zip archive of the project.
+* Create a zip archive of the project (_Prepare Upload_). Cache/build folders and items matched by the project's `.gitignore` rules (root and nested files) are excluded by default:
+  * an ignored directory is shown as a single entry in the exclusion dialog — its contents are not enumerated;
+  * ignored files are grouped per pattern (e.g. `*.log — 14 files`);
+  * every exclusion can be overridden by unchecking it in the dialog.
+  
+  A built-in `.gitignore` parser is always active; when the Git plugin is enabled, the IDE's VCS ignore state (including global gitignore rules) is consulted as well.
 
 ## General actions
 

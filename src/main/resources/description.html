@@ -28,6 +28,9 @@
 <h3>Skills Setup Wizard</h3>
 <p>An action available in the <code>Tools</code> menu. Browse AI agent skill repositories, select skills, and install them into your project. Works with any git repository (GitHub, GitLab, internal repos, etc.). Configure multiple repositories, choose a target directory (e.g., <code>.junie/skills</code> or <code>.claude/skills</code>), and install skills with one click.</p>
 <h3>Prepare project for sharing</h3>
-<p>An action available in the <code>Tools</code> menu and on the root directory context menu. It will compress the project to zip archive excluding <code>.gradle</code>, <code>`.kotlin`</code>, <code>`.idea`</code> folder and <code>build</code> directories</p>
+<p>An action available in the <code>Tools</code> menu and on the root directory context menu. It will compress the project to zip archive excluding <code>.gradle</code>, <code>`.kotlin`</code>, <code>`.idea`</code> folder and <code>build</code> directories.
+    Directories and files matched by the project's <code>.gitignore</code> rules (root and nested files) are excluded by default as well:
+    ignored directories are shown as a single entry in the exclusion dialog, ignored files are grouped per pattern (e.g. <code>*.log — 14 files</code>), and every exclusion can be overridden by unchecking it.
+    A built-in <code>.gitignore</code> parser is always active; when the Git plugin is enabled, the IDE's VCS ignore state (including global gitignore rules) is consulted as well.</p>
 <h1>Updates</h1>
 <p>Add <code>https://raw.githubusercontent.com/atyrin/kbtqa-plugin/refs/heads/main/repository/updatePlugins.xml</code> as a plugin repository.</p>

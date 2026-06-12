@@ -28,8 +28,9 @@ enum class ExclusionCategory(val displayName: String, val order: Int) {
     IDE_SETTINGS("IDE Settings", 4),
     VERSION_CONTROL("Version Control", 5),
     AI_ASSISTANT("AI Assistant", 6),
-    CONFIGURATION_FILES("Configuration Files", 7),
-    OTHER("Other", 8)
+    GIT_IGNORED("Git Ignored", 7),
+    CONFIGURATION_FILES("Configuration Files", 8),
+    OTHER("Other", 9)
 }
 
 /**
@@ -41,7 +42,8 @@ class ExcludeDirectoriesDialog(
     project: Project?,
     private val projectDir: File,
     private val defaultDirectoryExclusions: Set<String>,
-    private val defaultFileExclusions: Set<String> = emptySet()
+    private val defaultFileExclusions: Set<String> = emptySet(),
+    private val ignoreFilter: IgnoreFilter = NoopIgnoreFilter
 ) : DialogWrapper(project) {
 
     private val cardLayout = CardLayout()
@@ -54,16 +56,20 @@ class ExcludeDirectoriesDialog(
 
     /**
      * Represents an item (directory or file) that can be excluded from the archive.
-     * @param relativePath The relative path from project root
+     * @param relativePath The relative path from project root, or the pattern key for group items
      * @param isDefaultExclusion Whether this item is excluded by default
      * @param isFile Whether this is a file (true) or directory (false)
      * @param category The category for grouping this item in the UI
+     * @param displayLabel Optional label shown instead of [relativePath] (e.g. "*.log — 14 files")
+     * @param coveredPaths Concrete relative paths covered by a pattern-group item; empty for plain items
      */
     data class ExcludableItem(
         val relativePath: String,
         val isDefaultExclusion: Boolean,
         val isFile: Boolean = false,
-        val category: ExclusionCategory = ExclusionCategory.OTHER
+        val category: ExclusionCategory = ExclusionCategory.OTHER,
+        val displayLabel: String? = null,
+        val coveredPaths: List<String> = emptyList()
     )
 
     init {
@@ -86,7 +92,19 @@ class ExcludeDirectoriesDialog(
     private fun collectExcludableItems(): List<ExcludableItem> {
         val result = mutableListOf<ExcludableItem>()
         scanTopLevelOnlyItems(result)
-        scanDirectory(projectDir, "", result)
+        val gitIgnoredFilesByPattern = linkedMapOf<String, MutableList<String>>()
+        scanDirectory(projectDir, "", result, gitIgnoredFilesByPattern)
+        // Emit one group item per gitignore pattern for matched files
+        gitIgnoredFilesByPattern.forEach { (pattern, files) ->
+            result.add(ExcludableItem(
+                relativePath = pattern,
+                isDefaultExclusion = true,
+                isFile = true,
+                category = ExclusionCategory.GIT_IGNORED,
+                displayLabel = "$pattern — ${files.size} ${if (files.size == 1) "file" else "files"}",
+                coveredPaths = files.toList()
+            ))
+        }
         // Sort by category order first, then by relative path within each category
         result.sortWith(compareBy({ it.category.order }, { it.relativePath }))
         return result
@@ -119,7 +137,12 @@ class ExcludeDirectoriesDialog(
         }
     }
 
-    private fun scanDirectory(dir: File, relativePath: String, target: MutableList<ExcludableItem>) {
+    private fun scanDirectory(
+        dir: File,
+        relativePath: String,
+        target: MutableList<ExcludableItem>,
+        gitIgnoredFilesByPattern: MutableMap<String, MutableList<String>>
+    ) {
         if (!dir.isDirectory) return
 
         dir.listFiles()?.forEach { file ->
@@ -151,8 +174,18 @@ class ExcludeDirectoriesDialog(
                         ))
                     }
                     else -> {
-                        // Recursively scan subdirectories to find nested build folders
-                        scanDirectory(file, childRelativePath, target)
+                        // Gitignored directory: show as a single item, do not enumerate its contents
+                        if (ignoreFilter.match(childRelativePath, isDirectory = true) != null) {
+                            target.add(ExcludableItem(
+                                relativePath = childRelativePath,
+                                isDefaultExclusion = true,
+                                isFile = false,
+                                category = ExclusionCategory.GIT_IGNORED
+                            ))
+                        } else {
+                            // Recursively scan subdirectories to find nested build folders
+                            scanDirectory(file, childRelativePath, target, gitIgnoredFilesByPattern)
+                        }
                     }
                 }
             } else if (file.isFile) {
@@ -168,6 +201,12 @@ class ExcludeDirectoriesDialog(
                         isFile = true,
                         category = getCategoryForFile(file.name)
                     ))
+                } else {
+                    // Gitignored file: accumulate into its pattern group
+                    val match = ignoreFilter.match(childRelativePath, isDirectory = false)
+                    if (match != null) {
+                        gitIgnoredFilesByPattern.getOrPut(match.pattern) { mutableListOf() }.add(childRelativePath)
+                    }
                 }
             }
         }
@@ -274,9 +313,10 @@ class ExcludeDirectoriesDialog(
                     
                     // Add checkboxes for items in this category
                     for (item in items) {
-                        val checkbox = JBCheckBox(item.relativePath)
+                        val checkbox = JBCheckBox(item.displayLabel ?: item.relativePath)
                         checkbox.isSelected = item.isDefaultExclusion
                         checkbox.toolTipText = when {
+                            item.category == ExclusionCategory.GIT_IGNORED -> getGitIgnoredTooltip(item)
                             item.isFile && item.isDefaultExclusion -> "This file is excluded by default"
                             item.isFile -> "Check to exclude this file from the archive"
                             item.isDefaultExclusion -> "This directory is excluded by default (cache/build folder)"
@@ -332,16 +372,45 @@ class ExcludeDirectoriesDialog(
     }
 
     /**
+     * Builds the tooltip for a Git Ignored item, listing sample matched paths for pattern groups.
+     */
+    private fun getGitIgnoredTooltip(item: ExcludableItem): String {
+        if (item.coveredPaths.isEmpty()) {
+            return "This directory is ignored by .gitignore. Unchecking includes its whole subtree in the archive."
+        }
+        val sample = item.coveredPaths.take(TOOLTIP_SAMPLE_SIZE)
+        val more = item.coveredPaths.size - sample.size
+        return buildString {
+            append("<html>Files ignored by .gitignore. Unchecking includes all files in this group.<br><br>")
+            sample.forEach { append(it).append("<br>") }
+            if (more > 0) append("…and ").append(more).append(" more")
+            append("</html>")
+        }
+    }
+
+    /**
      * Returns the set of paths (directories and files) that should be excluded from the archive.
      * Only returns paths for items that are checked in the dialog.
+     * Pattern-group items are expanded into the concrete paths they cover.
      */
     fun getSelectedExclusions(): Set<String> {
-        return checkboxes.filter { it.value.isSelected }.keys.toSet()
+        val result = mutableSetOf<String>()
+        for (item in excludableItems) {
+            val checkbox = checkboxes[item.relativePath] ?: continue
+            if (!checkbox.isSelected) continue
+            if (item.coveredPaths.isNotEmpty()) {
+                result.addAll(item.coveredPaths)
+            } else {
+                result.add(item.relativePath)
+            }
+        }
+        return result
     }
 
     private companion object {
         const val LOADING_CARD = "loading"
         const val CONTENT_CARD = "content"
+        const val TOOLTIP_SAMPLE_SIZE = 10
     }
 }
 
