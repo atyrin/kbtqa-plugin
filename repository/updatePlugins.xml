@@ -2,8 +2,8 @@
 <plugins>
     <plugin
             id="kbtqa"
-            url="https://github.com/atyrin/kbtqa-plugin/releases/download/1.5.0/kbtqa-1.5.0.zip"
-            version="1.5.0">
-        <idea-version since-build="251"/>
+            url="https://github.com/atyrin/kbtqa-plugin/releases/download/1.5.1/kbtqa-1.5.1.zip"
+            version="1.5.1">
+        <idea-version since-build="252"/>
     </plugin>
 </plugins>
