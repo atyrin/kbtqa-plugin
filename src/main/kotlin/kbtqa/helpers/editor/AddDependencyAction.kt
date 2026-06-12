@@ -6,17 +6,22 @@ import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.popup.JBPopupFactory
+import com.intellij.ui.SimpleListCellRenderer
+import org.jetbrains.kotlin.psi.KtFile
 
 /**
  * Action that adds a context menu option for build.gradle.kts files
  * to insert dependency declarations.
+ *
+ * The snippets offered in the chooser popup depend on the caret context:
+ * the first applicable [DependencySnippetProvider] from [PROVIDERS] is used.
  */
 class AddDependencyAction : AnAction("Add Dependency", "Insert a dependency declaration", null), DumbAware {
 
     companion object {
-        private val DEPENDENCIES = listOf(
-            "\"org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2\"",
-            "\"com.squareup.okio:okio:3.15.0\""
+        private val PROVIDERS = listOf(
+            SwiftPMDependencySnippetProvider(),
+            MavenDependencySnippetProvider()
         )
     }
 
@@ -36,13 +41,21 @@ class AddDependencyAction : AnAction("Add Dependency", "Insert a dependency decl
         val project = e.project ?: return
         val file = e.getData(CommonDataKeys.VIRTUAL_FILE) ?: return
         val editor = e.getData(CommonDataKeys.EDITOR) ?: return
-        
+
+        // Determine the snippet provider applicable to the caret context
+        val context = DependencyInsertionContext(
+            ktFile = e.getData(CommonDataKeys.PSI_FILE) as? KtFile,
+            caretOffset = editor.caretModel.offset
+        )
+        val provider = PROVIDERS.first { it.isApplicable(context) }
+
         // Create and show popup with dependency options
         JBPopupFactory.getInstance()
-            .createPopupChooserBuilder(DEPENDENCIES)
-            .setTitle("Select Dependency")
-            .setItemChosenCallback { dependency ->
-                insertDependency(project, editor, dependency)
+            .createPopupChooserBuilder(provider.snippets)
+            .setTitle(provider.popupTitle)
+            .setRenderer(SimpleListCellRenderer.create("") { it.label })
+            .setItemChosenCallback { snippet ->
+                insertDependency(project, editor, snippet.code)
             }
             .createPopup()
             .showInBestPositionFor(e.dataContext)

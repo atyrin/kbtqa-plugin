@@ -10,7 +10,7 @@ For `gradle.properties`:
 
 For `build.gradle.kts`:
 * _Configure maven repositories_ will add a repositories section with popular maven repositories.
-* _Add dependency_ will suggest a list of KMP dependencies (GAV coordinates)
+* _Add dependency_ will suggest a list of KMP dependencies (GAV coordinates); with the caret inside a `swiftPMDependencies {}` block it suggests SwiftPM snippets (`swiftPackage(...)`, `localSwiftPackage(...)`) instead.
 * _Add Compiler Options_ will insert Kotlin compiler options configuration.
 * _Add Publishing_ will add maven-publish plugin and publishing configuration.
 
