@@ -1,6 +1,7 @@
 package kbtqa.helpers.projectview
 
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.ui.components.JBCheckBox
@@ -16,21 +17,21 @@ import java.io.File
 import javax.swing.BoxLayout
 import javax.swing.JComponent
 import javax.swing.JPanel
-import javax.swing.SwingUtilities
 
 /**
  * Categories for grouping excludable items in the dialog.
+ * The declaration order defines the display order in the dialog.
  */
-enum class ExclusionCategory(val displayName: String, val order: Int) {
-    BUILD_OUTPUT("Build Output", 1),
-    GRADLE_CACHE("Gradle Cache", 2),
-    KOTLIN_CACHE("Kotlin Cache", 3),
-    IDE_SETTINGS("IDE Settings", 4),
-    VERSION_CONTROL("Version Control", 5),
-    AI_ASSISTANT("AI Assistant", 6),
-    GIT_IGNORED("Git Ignored", 7),
-    CONFIGURATION_FILES("Configuration Files", 8),
-    OTHER("Other", 9)
+enum class ExclusionCategory(val displayName: String) {
+    BUILD_OUTPUT("Build Output"),
+    GRADLE_CACHE("Gradle Cache"),
+    KOTLIN_CACHE("Kotlin Cache"),
+    IDE_SETTINGS("IDE Settings"),
+    VERSION_CONTROL("Version Control"),
+    AI_ASSISTANT("AI Assistant"),
+    GIT_IGNORED("Git Ignored"),
+    CONFIGURATION_FILES("Configuration Files"),
+    OTHER("Other")
 }
 
 /**
@@ -106,7 +107,7 @@ class ExcludeDirectoriesDialog(
             ))
         }
         // Sort by category order first, then by relative path within each category
-        result.sortWith(compareBy({ it.category.order }, { it.relativePath }))
+        result.sortWith(compareBy({ it.category }, { it.relativePath }))
         return result
     }
 
@@ -215,26 +216,22 @@ class ExcludeDirectoriesDialog(
     /**
      * Determines the category for a directory based on its name.
      */
-    private fun getCategoryForDirectory(name: String): ExclusionCategory {
-        return when (name) {
-            "build" -> ExclusionCategory.BUILD_OUTPUT
-            ".gradle" -> ExclusionCategory.GRADLE_CACHE
-            ".kotlin" -> ExclusionCategory.KOTLIN_CACHE
-            ".idea" -> ExclusionCategory.IDE_SETTINGS
-            ".git" -> ExclusionCategory.VERSION_CONTROL
-            ".junie" -> ExclusionCategory.AI_ASSISTANT
-            else -> ExclusionCategory.OTHER
-        }
+    private fun getCategoryForDirectory(name: String): ExclusionCategory = when (name) {
+        "build" -> ExclusionCategory.BUILD_OUTPUT
+        ".gradle" -> ExclusionCategory.GRADLE_CACHE
+        ".kotlin" -> ExclusionCategory.KOTLIN_CACHE
+        ".idea" -> ExclusionCategory.IDE_SETTINGS
+        ".git" -> ExclusionCategory.VERSION_CONTROL
+        ".junie" -> ExclusionCategory.AI_ASSISTANT
+        else -> ExclusionCategory.OTHER
     }
 
     /**
      * Determines the category for a file based on its name.
      */
-    private fun getCategoryForFile(name: String): ExclusionCategory {
-        return when (name) {
-            "local.properties" -> ExclusionCategory.CONFIGURATION_FILES
-            else -> ExclusionCategory.OTHER
-        }
+    private fun getCategoryForFile(name: String): ExclusionCategory = when (name) {
+        "local.properties" -> ExclusionCategory.CONFIGURATION_FILES
+        else -> ExclusionCategory.OTHER
     }
 
     private fun loadExcludableItemsAsync() {
@@ -242,22 +239,21 @@ class ExcludeDirectoriesDialog(
         cardLayout.show(mainPanel, LOADING_CARD)
 
         ApplicationManager.getApplication().executeOnPooledThread {
-            runCatching { collectExcludableItems() }
-                .onSuccess { items ->
-                    SwingUtilities.invokeLater {
-                        excludableItems.clear()
-                        excludableItems.addAll(items)
-                        populateContentPanel()
-                        cardLayout.show(mainPanel, CONTENT_CARD)
-                        isOKActionEnabled = true
-                    }
-                }
-                .onFailure {
-                    SwingUtilities.invokeLater {
-                        populateErrorPanel(it)
-                        cardLayout.show(mainPanel, CONTENT_CARD)
-                    }
-                }
+            val result = runCatching { collectExcludableItems() }
+            ApplicationManager.getApplication().invokeLater(
+                {
+                    result
+                        .onSuccess { items ->
+                            excludableItems.clear()
+                            excludableItems.addAll(items)
+                            populateContentPanel()
+                            isOKActionEnabled = true
+                        }
+                        .onFailure { populateErrorPanel(it) }
+                    cardLayout.show(mainPanel, CONTENT_CARD)
+                },
+                ModalityState.any()
+            ) { isDisposed }
         }
     }
 
@@ -266,7 +262,7 @@ class ExcludeDirectoriesDialog(
      * (contains build.gradle or build.gradle.kts).
      */
     private fun isGradleModuleDirectory(dir: File): Boolean {
-        return dir.listFiles()?.any { it.isFile && it.name in setOf("build.gradle", "build.gradle.kts") } == true
+        return dir.listFiles()?.any { it.isFile && it.name in GRADLE_BUILD_SCRIPT_NAMES } == true
     }
 
     override fun createCenterPanel(): JComponent {
@@ -282,7 +278,6 @@ class ExcludeDirectoriesDialog(
         contentPanel.removeAll()
         contentPanel.border = JBUI.Borders.empty()
 
-        // Header label
         val headerLabel = JBLabel("Select items to exclude from the archive:")
         headerLabel.border = JBUI.Borders.emptyBottom(10)
         contentPanel.add(headerLabel, BorderLayout.NORTH)
@@ -290,51 +285,12 @@ class ExcludeDirectoriesDialog(
         if (excludableItems.isEmpty()) {
             contentPanel.add(JBLabel("No excludable items found in the project."), BorderLayout.CENTER)
         } else {
-            checkboxes.clear()
-            // Create panel with checkboxes grouped by category
-            val checkboxPanel = JPanel()
-            checkboxPanel.layout = BoxLayout(checkboxPanel, BoxLayout.Y_AXIS)
-            checkboxPanel.border = JBUI.Borders.empty(5)
-
-            // Group items by category
-            val itemsByCategory = excludableItems.groupBy { it.category }
-            
-            // Iterate through categories in order
-            ExclusionCategory.entries
-                .filter { it in itemsByCategory }
-                .forEach { category ->
-                    val items = itemsByCategory[category] ?: return@forEach
-                    
-                    // Add category header
-                    val categoryHeader = JBLabel(category.displayName)
-                    categoryHeader.font = categoryHeader.font.deriveFont(Font.BOLD)
-                    categoryHeader.border = JBUI.Borders.empty(8, 0, 4, 0)
-                    checkboxPanel.add(categoryHeader)
-                    
-                    // Add checkboxes for items in this category
-                    for (item in items) {
-                        val checkbox = JBCheckBox(item.displayLabel ?: item.relativePath)
-                        checkbox.isSelected = item.isDefaultExclusion
-                        checkbox.toolTipText = when {
-                            item.category == ExclusionCategory.GIT_IGNORED -> getGitIgnoredTooltip(item)
-                            item.isFile && item.isDefaultExclusion -> "This file is excluded by default"
-                            item.isFile -> "Check to exclude this file from the archive"
-                            item.isDefaultExclusion -> "This directory is excluded by default (cache/build folder)"
-                            else -> "Check to exclude this directory from the archive"
-                        }
-                        checkbox.border = JBUI.Borders.emptyLeft(16)
-                        checkboxes[item.relativePath] = checkbox
-                        checkboxPanel.add(checkbox)
-                    }
-                }
-
-            val scrollPane = JBScrollPane(checkboxPanel)
+            val scrollPane = JBScrollPane(createCheckboxPanel())
             scrollPane.border = JBUI.Borders.empty()
             scrollPane.preferredSize = Dimension(400, 300)
             contentPanel.add(scrollPane, BorderLayout.CENTER)
         }
 
-        // Footer with info
         val footerLabel = JBLabel("<html><i>Checked items will be excluded from the zip archive.</i></html>")
         footerLabel.border = JBUI.Borders.emptyTop(10)
         contentPanel.add(footerLabel, BorderLayout.SOUTH)
@@ -343,14 +299,57 @@ class ExcludeDirectoriesDialog(
         contentPanel.repaint()
     }
 
+    /**
+     * Creates the panel with checkboxes for all excludable items, grouped by category.
+     */
+    private fun createCheckboxPanel(): JPanel {
+        checkboxes.clear()
+        val checkboxPanel = JPanel()
+        checkboxPanel.layout = BoxLayout(checkboxPanel, BoxLayout.Y_AXIS)
+        checkboxPanel.border = JBUI.Borders.empty(5)
+
+        val itemsByCategory = excludableItems.groupBy { it.category }
+        ExclusionCategory.entries.forEach { category ->
+            val items = itemsByCategory[category] ?: return@forEach
+
+            val categoryHeader = JBLabel(category.displayName)
+            categoryHeader.font = categoryHeader.font.deriveFont(Font.BOLD)
+            categoryHeader.border = JBUI.Borders.empty(8, 0, 4, 0)
+            checkboxPanel.add(categoryHeader)
+
+            for (item in items) {
+                val checkbox = createItemCheckbox(item)
+                checkboxes[item.relativePath] = checkbox
+                checkboxPanel.add(checkbox)
+            }
+        }
+        return checkboxPanel
+    }
+
+    /**
+     * Creates a checkbox for a single excludable item with an explanatory tooltip.
+     */
+    private fun createItemCheckbox(item: ExcludableItem): JBCheckBox {
+        val checkbox = JBCheckBox(item.displayLabel ?: item.relativePath)
+        checkbox.isSelected = item.isDefaultExclusion
+        checkbox.toolTipText = when {
+            item.category == ExclusionCategory.GIT_IGNORED -> getGitIgnoredTooltip(item)
+            item.isFile && item.isDefaultExclusion -> "This file is excluded by default"
+            item.isFile -> "Check to exclude this file from the archive"
+            item.isDefaultExclusion -> "This directory is excluded by default (cache/build folder)"
+            else -> "Check to exclude this directory from the archive"
+        }
+        checkbox.border = JBUI.Borders.emptyLeft(16)
+        return checkbox
+    }
+
     private fun populateErrorPanel(error: Throwable) {
         checkboxes.clear()
         excludableItems.clear()
         contentPanel.removeAll()
         contentPanel.border = JBUI.Borders.empty()
         val message = error.message ?: "Unknown error"
-        val label = JBLabel("Failed to load exclusions: ${'$'}message")
-        contentPanel.add(label, BorderLayout.CENTER)
+        contentPanel.add(JBLabel("Failed to load exclusions: $message"), BorderLayout.CENTER)
         contentPanel.revalidate()
         contentPanel.repaint()
     }
@@ -393,18 +392,11 @@ class ExcludeDirectoriesDialog(
      * Only returns paths for items that are checked in the dialog.
      * Pattern-group items are expanded into the concrete paths they cover.
      */
-    fun getSelectedExclusions(): Set<String> {
-        val result = mutableSetOf<String>()
+    fun getSelectedExclusions(): Set<String> = buildSet {
         for (item in excludableItems) {
-            val checkbox = checkboxes[item.relativePath] ?: continue
-            if (!checkbox.isSelected) continue
-            if (item.coveredPaths.isNotEmpty()) {
-                result.addAll(item.coveredPaths)
-            } else {
-                result.add(item.relativePath)
-            }
+            if (checkboxes[item.relativePath]?.isSelected != true) continue
+            if (item.coveredPaths.isNotEmpty()) addAll(item.coveredPaths) else add(item.relativePath)
         }
-        return result
     }
 
     private companion object {
@@ -419,3 +411,6 @@ private val TOP_LEVEL_ONLY_DIRECTORIES = setOf(".idea", ".junie")
 
 // Files that should only be searched at the top project level
 private val TOP_LEVEL_ONLY_FILES = setOf("local.properties")
+
+// Build script files that identify a directory as a Gradle module
+private val GRADLE_BUILD_SCRIPT_NAMES = setOf("build.gradle", "build.gradle.kts")
