@@ -25,6 +25,7 @@ import java.util.zip.ZipOutputStream
  * 
  * This action performs the following steps:
  * 1. Creates a zip archive of the project, excluding cache folders (.gradle, .kotlin, .idea, build)
+ *    and items matched by the project's .gitignore rules
  * 2. Opens the zip file location in Finder (macOS) or Windows Explorer
  * 
  * Note: Cache folders are excluded from the zip but remain in their original location.
@@ -65,8 +66,11 @@ class PrepareUploadAction :
             return
         }
 
+        // Build the gitignore-aware filter; rule loading is lazy and happens on the dialog's pooled thread
+        val ignoreFilter = IgnoreFilters.forProject(project, projectDir, ALWAYS_EXCLUDE_CACHE_FOLDERS)
+
         // Show dialog to select directories and files to exclude
-        val dialog = ExcludeDirectoriesDialog(project, projectDir, ALWAYS_EXCLUDE_CACHE_FOLDERS, DEFAULT_EXCLUDE_FILES)
+        val dialog = ExcludeDirectoriesDialog(project, projectDir, ALWAYS_EXCLUDE_CACHE_FOLDERS, DEFAULT_EXCLUDE_FILES, ignoreFilter)
         if (!dialog.showAndGet()) {
             // User cancelled the dialog
             return

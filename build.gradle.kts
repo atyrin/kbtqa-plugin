@@ -32,6 +32,8 @@ dependencies {
         bundledPlugin("org.jetbrains.kotlin")
         bundledPlugin("Git4Idea")
     }
+
+    testImplementation(kotlin("test"))
 }
 
 
