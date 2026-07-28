@@ -43,7 +43,7 @@ dependencies {
 intellijPlatform {
     pluginConfiguration {
         ideaVersion {
-            sinceBuild = "252"
+            sinceBuild = providers.gradleProperty("pluginSinceBuild")
         }
 
         changeNotes = """

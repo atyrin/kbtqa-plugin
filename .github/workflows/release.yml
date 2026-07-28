@@ -1,0 +1,129 @@
+name: Release
+
+# Pushing a tag like `1.5.2` is the whole release:
+#   1. build the plugin at that version
+#   2. create a GitHub Release with kbtqa-<version>.zip attached
+#   3. point repository/updatePlugins.xml at it and commit that to main
+#
+# `workflow_dispatch` is a dry run only: it builds and prints the XML it would
+# commit, but creates no release and pushes nothing.
+
+on:
+  push:
+    tags: [ '[0-9]+.[0-9]+.[0-9]+' ]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Dry run version (builds + previews the XML, creates nothing)'
+        required: true
+        default: '0.0.0-dryrun'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # A tag push checks out the tag in detached HEAD; we need main's
+          # history too so the updatePlugins.xml commit can target it.
+          fetch-depth: 0
+
+      - name: Resolve version
+        id: v
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "version=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+            echo "dry_run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+            echo "dry_run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # -Pversion overrides the SNAPSHOT default in gradle.properties, so the tag
+      # is the single source of truth for both plugin.xml and the archive name.
+      - name: Build IDE Plugin
+        run: ./gradlew buildPlugin -Pversion=${{ steps.v.outputs.version }}
+
+      - name: Locate artifact
+        id: zip
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          ZIP="build/distributions/kbtqa-${VERSION}.zip"
+          if [ ! -f "$ZIP" ]; then
+            echo "::error::Expected $ZIP but it was not produced"
+            ls -la build/distributions || true
+            exit 1
+          fi
+          echo "path=$ZIP" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        if: steps.v.outputs.dry_run == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.v.outputs.version }}
+          ZIP: ${{ steps.zip.outputs.path }}
+        run: |
+          gh release create "$VERSION" \
+            --title "$VERSION" \
+            --generate-notes \
+            "$ZIP"
+
+      - name: Update plugin repository XML on main
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+          DRY_RUN: ${{ steps.v.outputs.dry_run }}
+        run: |
+          SINCE_BUILD=$(grep -E '^pluginSinceBuild=' gradle.properties | cut -d= -f2)
+          if [ -z "$SINCE_BUILD" ]; then
+            echo "::error::pluginSinceBuild is missing from gradle.properties"
+            exit 1
+          fi
+
+          git fetch origin main
+          git checkout -B main origin/main
+
+          cat > repository/updatePlugins.xml <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <plugins>
+              <plugin
+                      id="kbtqa"
+                      url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${VERSION}/kbtqa-${VERSION}.zip"
+                      version="${VERSION}">
+                  <idea-version since-build="${SINCE_BUILD}"/>
+              </plugin>
+          </plugins>
+          EOF
+
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "--- dry run: would commit the following to main ---"
+            cat repository/updatePlugins.xml
+            exit 0
+          fi
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add repository/updatePlugins.xml
+          if git diff --staged --quiet; then
+            echo "updatePlugins.xml already up to date; nothing to commit"
+          else
+            git commit -m "Update IJ repo to ${VERSION}"
+            git push origin main
+          fi
