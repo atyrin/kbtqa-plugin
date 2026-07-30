@@ -12,7 +12,7 @@ class ConfigureBuildScanAction :
 
     companion object {
         private const val PLUGIN_ID_WITHOUT_VERSION = "id(\"com.gradle.develocity\")"
-        private const val PLUGIN_ID = "$PLUGIN_ID_WITHOUT_VERSION version(\"3.17\")"
+        private const val PLUGIN_ID = "$PLUGIN_ID_WITHOUT_VERSION version(\"4.3.3\")"
 
         private const val DEVELOCITY_BLOCK_NAME = "develocity"
         private const val PLUGINS_BLOCK_NAME = "plugins"
