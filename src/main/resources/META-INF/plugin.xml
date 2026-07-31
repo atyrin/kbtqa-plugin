@@ -19,11 +19,7 @@
     <!-- Extension points defined by the plugin.
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-extension-points.html -->
     <extensions defaultExtensionNs="com.intellij">
-        <notificationGroup id="Stacktrace Copy" 
-                          displayType="BALLOON" 
-                          toolWindowId="Terminal"
-                          isLogByDefault="false"/>
-        <notificationGroup id="Tool Versions" 
+        <notificationGroup id="Tool Versions"
                           displayType="BALLOON" 
                           isLogByDefault="false"/>
         <notificationGroup id="Skills Setup"
@@ -31,9 +27,6 @@
                           isLogByDefault="false"/>
         <applicationService
                 serviceImplementation="kbtqa.helpers.skills.SkillsSettingsState"/>
-        <codeInsight.lineMarkerProvider
-                language="TEXT"
-                implementationClass="kbtqa.stacktraces.StacktraceLineMarkerProvider"/>
     </extensions>
 
     <extensions defaultExtensionNs="org.jetbrains.kotlin">
@@ -41,15 +34,6 @@
     </extensions>
     
     <actions>
-        <action id="kbtqa.stacktraces.StacktraceCopyAction"
-                class="kbtqa.stacktraces.StacktraceCopyAction"
-                text="Copy Stacktrace"
-                description="Copy stacktrace to clipboard">
-<!--            <add-to-group group-id="ConsoleView.PopupMenu" anchor="first"/>-->
-            <add-to-group group-id="ConsoleEditorPopupMenu" anchor="first"/>
-            <add-to-group group-id="ToolWindowContextMenu" anchor="first"/>
-            <add-to-group group-id="BuildMenu" anchor="last"/>
-        </action>
         <action id="kbtqa.helpers.versions.ToolVersionsAction"
                 class="kbtqa.helpers.versions.ToolVersionsAction"
                 text="Show Tool Versions"

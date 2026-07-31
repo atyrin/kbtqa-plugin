@@ -4,7 +4,7 @@
 
 **KBT QA Swiss Knife** (plugin id `kbtqa`, display name "KBT QA Swiss Army Knife") is an IntelliJ IDEA
 plugin by Andrey Tyrin providing quality-of-life features for developers working with Kotlin and Gradle
-projects. Five feature areas:
+projects. Four feature areas:
 
 1. **Editor helpers** — the _QA Helpers_ context-menu group on Gradle files: repositories, dependencies,
    compiler options, publishing, build scan, build cache, `gradle.properties` entries, version catalog.
@@ -14,7 +14,6 @@ projects. Five feature areas:
    versions from their respective repositories.
 4. **Skills Setup Wizard** — `Tools ▸ Skills Setup Wizard`, clones a git repository of AI agent skills and
    installs selected ones into the project.
-5. **Stacktrace handling** — stacktrace copy action with line markers and context-menu integration.
 
 `readme.md` is the detailed user-facing feature reference; keep this file short and point there.
 
@@ -26,17 +25,15 @@ kbtqa-plugin/
 ├── settings.gradle.kts
 ├── gradle.properties                      # pluginSinceBuild, fallback version, Gradle flags
 ├── src/main/kotlin/kbtqa/
-│   ├── helpers/
-│   │   ├── editor/                        # QA Helpers context-menu actions on Gradle files
-│   │   ├── projectview/                   # Project-tree actions: exclude dirs, Prepare Upload
-│   │   ├── skills/                        # Skills Setup Wizard (git clone + install)
-│   │   └── versions/                      # Tool versions viewer and its per-tool services
-│   └── stacktraces/                       # Stacktrace copy action + line marker provider
+│   └── helpers/
+│       ├── editor/                        # QA Helpers context-menu actions on Gradle files
+│       ├── projectview/                   # Project-tree actions: exclude dirs, Prepare Upload
+│       ├── skills/                        # Skills Setup Wizard (git clone + install)
+│       └── versions/                      # Tool versions viewer and its per-tool services
 ├── src/main/resources/
 │   ├── META-INF/plugin.xml                # Plugin descriptor
 │   ├── META-INF/kbtqa-withGit.xml         # Optional descriptor, loaded only when Git4Idea is present
-│   ├── description.html                   # Marketplace description, inlined by build.gradle.kts
-│   └── icons/
+│   └── description.html                   # Marketplace description, inlined by build.gradle.kts
 ├── src/test/kotlin/kbtqa/                 # JUnit tests (IntelliJ Platform test framework)
 ├── .github/workflows/                     # gradle.yml (CI), release.yml (tag-driven release)
 ├── repository/updatePlugins.xml           # Custom plugin repo descriptor — generated, do not hand-edit
@@ -121,8 +118,7 @@ that version, creates a GitHub Release with the zip, and regenerates `repository
 
 ### Code Quality
 - Follow existing code patterns and structure
-- Maintain the separation between the `helpers/{editor,projectview,skills,versions}` and `stacktraces`
-  packages
+- Maintain the separation between the `helpers/{editor,projectview,skills,versions}` packages
 - Ensure proper error handling and user feedback
 - Test edge cases, especially file type detection and context validation
 
