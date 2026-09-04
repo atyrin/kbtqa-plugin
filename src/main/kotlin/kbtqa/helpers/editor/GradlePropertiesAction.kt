@@ -30,7 +30,10 @@ class GradlePropertiesAction : AnAction("Add Gradle Property", "Insert a Gradle 
         private val PROPERTIES: List<PropertyItem> = listOf(
             PropertyItem.Entry("kotlin.internal.compiler.arguments.log.level=warning"),
             PropertyItem.Entry("kotlin.native.enableKlibsCrossCompilation=false"),
-            PropertyItem.Entry("kotlin.compiler.runViaBuildToolsApi=true"),
+            PropertyItem.Entry("kotlin.compiler.runViaBuildToolsApi=false"),
+            PropertyItem.Entry("kotlin.metadata.runViaBuildToolsApi=false"),
+            PropertyItem.Entry("kotlin.js.runViaBuildToolsApi=false"),
+            PropertyItem.Entry("kotlin.wasm.runViaBuildToolsApi=false"),
             PropertyItem.Entry("kotlin.daemon.useFallbackStrategy=false"),
             PropertyItem.Entry("kotlin.build.report.verbose=true"),
             PropertyItem.Entry("kotlin.build.report.output=file"),
