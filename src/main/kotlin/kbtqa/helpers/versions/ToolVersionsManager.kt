@@ -37,7 +37,8 @@ class ToolVersionsManager {
             lazy { ApplicationManager.getApplication().service<AndroidVersionsService>() },
             lazy { ApplicationManager.getApplication().service<KSPVersionsService>() },
             lazy { ApplicationManager.getApplication().service<DokkaVersionsService>() },
-            lazy { ApplicationManager.getApplication().service<GradleVersionsService>() }
+            lazy { ApplicationManager.getApplication().service<GradleVersionsService>() },
+            lazy { ApplicationManager.getApplication().service<MavenVersionsService>() }
         )
     }
 

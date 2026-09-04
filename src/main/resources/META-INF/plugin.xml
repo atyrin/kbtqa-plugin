@@ -13,6 +13,7 @@
     <!-- Product and plugin compatibility requirements.
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html -->
     <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.xml</depends>
     <depends>org.jetbrains.kotlin</depends>
     <depends optional="true" config-file="kbtqa-withGit.xml">Git4Idea</depends>
 
@@ -40,7 +41,7 @@
         <action id="kbtqa.helpers.versions.ToolVersionsAction"
                 class="kbtqa.helpers.versions.ToolVersionsAction"
                 text="Show Tool Versions"
-                description="Display available versions for different development tools (Kotlin, Android Gradle Plugin, etc.)">
+                description="Display available versions for different development tools (Kotlin, Android Gradle Plugin, Gradle, Maven, etc.)">
             <add-to-group group-id="ToolsMenu" anchor="last"/>
         </action>
         <action id="kbtqa.helpers.projectview.ConfigureVersionCatalogAction"

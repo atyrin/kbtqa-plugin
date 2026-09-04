@@ -6,12 +6,13 @@
 plugin by Andrey Tyrin providing quality-of-life features for developers working with Kotlin and Gradle
 projects. Four feature areas:
 
-1. **Editor helpers** — the _QA Helpers_ context-menu group on Gradle files: repositories, dependencies,
-   compiler options, publishing, build scan, build cache, `gradle.properties` entries, version catalog.
+1. **Editor helpers** — the _QA Helpers_ context-menu group on Gradle and Maven build files:
+   repositories, dependencies, compiler options, publishing, build scan, build cache,
+   `gradle.properties` entries, version catalog, and Kotlin compiler properties for `pom.xml`.
 2. **Project-view actions** — exclude/delete cache directories, and _Prepare Upload_ (zip a project as a
    reproducer, honouring `.gitignore`).
-3. **Tool versions** — `Tools ▸ Show Tool Versions`, fetching the latest KGP, AGP, KSP, Dokka and Gradle
-   versions from their respective repositories.
+3. **Tool versions** — `Tools ▸ Show Tool Versions`, fetching the latest KGP, AGP, KSP, Dokka, Gradle
+   and Maven versions from their respective repositories.
 4. **Skills Setup Wizard** — `Tools ▸ Skills Setup Wizard`, clones a git repository of AI agent skills and
    installs selected ones into the project.
 
@@ -81,9 +82,12 @@ CI (`.github/workflows/gradle.yml`) runs `./gradlew buildPlugin test` on every p
 ### Testing Strategy
 - Add headless tests under `src/test/kotlin/` for pure logic (parsing, filtering, version resolution);
   see `src/test/kotlin/kbtqa/helpers/projectview/GitignoreFileFilterTest.kt` for the existing pattern
+- PSI-editing logic can also be tested headlessly with the IntelliJ fixture — extend
+  `BasePlatformTestCase`, build the file with `myFixture.configureByText(...)` and assert on
+  `myFixture.editor.document.text`; see `src/test/kotlin/kbtqa/helpers/editor/MavenPropertiesActionTest.kt`
 - Verify UI-bound behaviour in a development IDE instance using `./gradlew runIde`
-- Verify actions work correctly with the relevant Gradle file types (`build.gradle.kts`,
-  `settings.gradle.kts`, `gradle.properties`) and in the correct context menus
+- Verify actions work correctly with the relevant build file types (`build.gradle.kts`,
+  `settings.gradle.kts`, `gradle.properties`, `pom.xml`) and in the correct context menus
 
 ### Plugin Development Best Practices
 - Actions should implement `DumbAware` when possible for better IDE performance
@@ -95,7 +99,7 @@ CI (`.github/workflows/gradle.yml`) runs `./gradlew buildPlugin test` on every p
 - Follow IntelliJ Platform plugin development guidelines
 
 ### File Modification Guidelines
-- QA Helper actions should only be enabled for relevant Gradle files
+- QA Helper actions should only be enabled for the build files they apply to
 - Maintain backward compatibility with existing functionality
 - Test actions in both editor context menus and dedicated action groups
 
