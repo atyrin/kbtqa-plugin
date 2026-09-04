@@ -8,6 +8,10 @@ The options depend on the file where the context menu is opened.
 For `gradle.properties`:
 * a list with well-known properties.
 
+For `pom.xml`:
+* _Configure Repositories_ will declare the Kotlin `dev`, `bootstrap` and `experimental` repositories in both `<repositories>` and `<pluginRepositories>`, creating either section when it is missing. Existing sections are merged into, not replaced: a repository whose URL is already declared is left alone (trailing slashes do not count as a difference), so running the action twice changes nothing.
+* _Add Maven Property_ will suggest a list of well-known properties and insert the chosen one into the `<properties>` section. The list is split into Kotlin compiler properties (`kotlin.compiler.jvmTarget`, `languageVersion`, `apiVersion`, `jdkRelease`, `jdkHome`, `daemon`, `incremental`) and plain Maven ones (`maven.compiler.release`, `maven.compiler.target`). The section enclosing the caret is used—so a `<profile>` gets its own—otherwise the one in the root `<project>` tag, which is created when missing. Properties that are already declared are not duplicated: the caret simply jumps to the existing entry.
+
 For `build.gradle.kts`:
 * _Configure maven repositories_ will add a repositories section with popular maven repositories.
 * _Add dependency_ will suggest a list of KMP dependencies (GAV coordinates); with the caret inside a `swiftPMDependencies {}` block it suggests SwiftPM snippets (`swiftPackage(...)`, `localSwiftPackage(...)`) instead.
@@ -39,6 +43,8 @@ For the project root directory:
 ### Shows the latest tooling versions
 An action available in the `Tools` menu. It will show all available versions from maven repositories for different tools.
 KGP from stable/dev and experimental channels. AGP from google repo. KSP and Dokka from maven central. Gradle versions from GitHub releases.
+Maven shows three channels: the Apache Maven distribution and `maven-compiler-plugin` from maven central, and the Maven Daemon (`mvnd`) from GitHub releases.
+`kotlin-maven-plugin` is not listed separately—it shares its version numbers with KGP, which is already in the Kotlin tab.
 
 ### Skills Setup Wizard
 An action available in the `Tools` menu. It opens a dialog that lets you browse AI agent skill repositories, select skills, and install them into your project. Works with any git repository (GitHub, GitLab, internal repos, etc.).

@@ -47,6 +47,8 @@ intellijPlatform {
         }
 
         changeNotes = """
+      Add Kotlin compiler properties and repository configuration for pom.xml<br>
+      Show Maven, maven-compiler-plugin and mvnd versions in Show Tool Versions<br>
       Add Create KMP Source Sets QA helper, update the Gradle properties list (1.6.0)<br>
       Add skills wizard (1.5.0)
     """.trimIndent()

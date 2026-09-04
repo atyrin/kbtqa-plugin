@@ -6,6 +6,18 @@
 <ul>
     <li>a list with well-known properties.</li>
 </ul>
+<p>For <code>pom.xml</code>:</p>
+<ul>
+    <li><em>Configure Repositories</em> will declare the Kotlin <code>dev</code>, <code>bootstrap</code> and
+        <code>experimental</code> repositories in both <code>&lt;repositories&gt;</code> and
+        <code>&lt;pluginRepositories&gt;</code>, creating either section when it is missing. Existing sections are
+        merged into, so already declared repositories are never duplicated.</li>
+    <li><em>Add Maven Property</em> will suggest a list of well-known properties — Kotlin compiler ones
+        (<code>kotlin.compiler.jvmTarget</code>, <code>languageVersion</code>, <code>apiVersion</code>,
+        <code>jdkRelease</code>, <code>jdkHome</code>, <code>daemon</code>, <code>incremental</code>) and plain Maven
+        ones (<code>maven.compiler.release</code>, <code>maven.compiler.target</code>) — and insert the chosen one
+        into the <code>&lt;properties&gt;</code> section, creating that section when it is missing.</li>
+</ul>
 <p>For <code>build.gradle.kts</code>:</p>
 <ul>
     <li><em>Configure maven repositories</em> will add a repositories section with popular maven repositories.</li>
@@ -25,7 +37,9 @@
 </ul>
 <h2>General actions</h2>
 <h3>Shows the latest tooling versions</h3>
-<p>An action available in the <code>Tools</code> menu. It will show all available versions for KGP, AGP, KSP, Dokka from maven repositories</p>
+<p>An action available in the <code>Tools</code> menu. It will show all available versions for KGP, AGP, KSP, Dokka and Gradle.
+    The Maven tab lists the Apache Maven distribution and <code>maven-compiler-plugin</code> from Maven Central, plus the
+    Maven Daemon (<code>mvnd</code>) from GitHub releases.</p>
 <h3>Skills Setup Wizard</h3>
 <p>An action available in the <code>Tools</code> menu. Browse AI agent skill repositories, select skills, and install them into your project. Works with any git repository (GitHub, GitLab, internal repos, etc.). Configure multiple repositories, choose a target directory (e.g., <code>.junie/skills</code> or <code>.claude/skills</code>), and install skills with one click.</p>
 <h3>Prepare project for sharing</h3>
