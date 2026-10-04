@@ -47,7 +47,7 @@ intellijPlatform {
         }
 
         changeNotes = """
-      Add Create KMP Source Sets QA helper<br>
+      Add Create KMP Source Sets QA helper, update the Gradle properties list (1.6.0)<br>
       Add skills wizard (1.5.0)
     """.trimIndent()
         description = project.file("src/main/resources/description.html").readText()
