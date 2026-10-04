@@ -25,6 +25,9 @@
         <notificationGroup id="Skills Setup"
                           displayType="BALLOON"
                           isLogByDefault="false"/>
+        <notificationGroup id="QA Helpers"
+                          displayType="BALLOON"
+                          isLogByDefault="false"/>
         <applicationService
                 serviceImplementation="kbtqa.helpers.skills.SkillsSettingsState"/>
     </extensions>

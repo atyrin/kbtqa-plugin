@@ -11,6 +11,7 @@
     <li><em>Configure maven repositories</em> will add a repositories section with popular maven repositories.</li>
     <li><em>Add dependency</em> will suggest a list of KMP dependencies (GAV coordinates); with the caret inside a <code>swiftPMDependencies {}</code> block it suggests SwiftPM snippets (<code>swiftPackage(...)</code>, <code>localSwiftPackage(...)</code>) instead</li>
     <li><em>Add Compiler Options</em> will insert Kotlin compiler options configuration</li>
+    <li><em>Create KMP Source Sets</em> will read the targets from the <code>kotlin {}</code> block and create all platform and shared source sets (following the default hierarchy template), each with a class named after the source set, e.g. <code>src/iosMain/kotlin/IosMain.kt</code></li>
     <li><em>Add JVM Publishing</em> will add maven-publish plugin and publishing configuration</li>
 </ul>
 <p>For <code>settings.gradle.kts</code>:</p>

@@ -12,6 +12,10 @@ For `build.gradle.kts`:
 * _Configure maven repositories_ will add a repositories section with popular maven repositories.
 * _Add dependency_ will suggest a list of KMP dependencies (GAV coordinates); with the caret inside a `swiftPMDependencies {}` block it suggests SwiftPM snippets (`swiftPackage(...)`, `localSwiftPackage(...)`) instead.
 * _Add Compiler Options_ will insert Kotlin compiler options configuration.
+* _Create KMP Source Sets_ reads the targets declared in the `kotlin {}` block (`jvm()`, `js {}`, `iosArm64()`, `android {}`, custom names such as `jvm("desktop")`, calls inside `listOf(...)`; comments are ignored) and creates every platform and shared source set with a class named after it, e.g. `src/iosMain/kotlin/IosMain.kt` containing `class IosMain`:
+  * shared source sets follow the Kotlin default hierarchy template (`commonMain` → `webMain`/`nativeMain` → `appleMain`/`linuxMain`/… → `iosMain`/…), a group is created only when a selected target belongs to it;
+  * a dialog lets you adjust the targets (detected ones are pre-selected, the rest can be added manually), include test source sets, include custom source sets created in `sourceSets {}`, and set a package;
+  * existing classes are never overwritten; reload the Gradle project afterwards if the new directories are not marked as source roots.
 * _Add Publishing_ will add maven-publish plugin and publishing configuration.
 
 For `settings.gradle.kts`:

@@ -47,6 +47,7 @@ intellijPlatform {
         }
 
         changeNotes = """
+      Add Create KMP Source Sets QA helper<br>
       Add skills wizard (1.5.0)
     """.trimIndent()
         description = project.file("src/main/resources/description.html").readText()

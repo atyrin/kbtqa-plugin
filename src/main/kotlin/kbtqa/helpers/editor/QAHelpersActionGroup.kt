@@ -34,6 +34,7 @@ class QAHelpersActionGroup : ActionGroup("QA Helpers", "Helper actions for QA ta
             AddDependencyAction(),
             AddCompilerOptionsAction(),
             AddJvmPublishingAction(),
+            CreateKmpSourceSetsAction(),
             Separator.create("Settings"),
             ConfigureBuildScanAction(),
             ConfigureBuildCacheAction(),
