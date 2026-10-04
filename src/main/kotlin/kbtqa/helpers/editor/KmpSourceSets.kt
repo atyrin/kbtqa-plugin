@@ -9,7 +9,7 @@ package kbtqa.helpers.editor
  * @param displayName Human-readable name used in the UI
  */
 enum class KmpGroup(val sourceSetPrefix: String, val parent: KmpGroup?, val displayName: String) {
-    COMMON("common", null, "JVM, Android, WASI"),
+    COMMON("common", null, "Common"),
     WEB("web", COMMON, "Web"),
     NATIVE("native", COMMON, "Native"),
     APPLE("apple", NATIVE, "Apple"),
@@ -46,9 +46,9 @@ enum class KmpTargetPreset(
     ANDROID_TARGET(listOf("androidTarget"), "android", KmpGroup.COMMON),
     /** Target of the `com.android.kotlin.multiplatform.library` plugin: `android {}` (AGP 9+) or `androidLibrary {}`. */
     ANDROID_LIBRARY(listOf("android", "androidLibrary"), "android", KmpGroup.COMMON, requiresBlock = true),
-    WASM_WASI(listOf("wasmWasi"), "wasmWasi", KmpGroup.COMMON),
     JS(listOf("js"), "js", KmpGroup.WEB),
     WASM_JS(listOf("wasmJs"), "wasmJs", KmpGroup.WEB),
+    WASM_WASI(listOf("wasmWasi"), "wasmWasi", KmpGroup.COMMON),
     IOS_X64(listOf("iosX64"), "iosX64", KmpGroup.IOS),
     IOS_ARM64(listOf("iosArm64"), "iosArm64", KmpGroup.IOS),
     IOS_SIMULATOR_ARM64(listOf("iosSimulatorArm64"), "iosSimulatorArm64", KmpGroup.IOS),
@@ -74,21 +74,27 @@ enum class KmpTargetPreset(
     val dslDeclaration: String get() = if (requiresBlock) "${dslNames.first()} {}" else "${dslNames.first()}()"
 
     /**
-     * Test source sets created for a target of this preset.
-     * The Android KMP library target only has host/device tests when they are enabled in its [configuration].
+     * Heading of the target in the UI. Targets placed directly under `commonMain` have no shared group,
+     * so they get their own headings instead of [group]'s name.
      */
-    fun testSourceSets(targetName: String, configuration: String): List<String> = when (this) {
+    val section: String
+        get() = when (this) {
+            JVM, ANDROID_TARGET, ANDROID_LIBRARY -> "JVM & Android"
+            WASM_WASI -> "WASI"
+            else -> group.displayName
+        }
+
+    /**
+     * Test source sets created for a target of this preset. The Android KMP library target only has
+     * host/device tests when `withHostTest`/`withDeviceTest` are among its [configurationCalls].
+     */
+    fun testSourceSets(targetName: String, configurationCalls: Set<String>): List<String> = when (this) {
         ANDROID_TARGET -> listOf("${targetName}UnitTest", "${targetName}InstrumentedTest")
         ANDROID_LIBRARY -> buildList {
-            if (WITH_HOST_TEST.containsMatchIn(configuration)) add("${targetName}HostTest")
-            if (WITH_DEVICE_TEST.containsMatchIn(configuration)) add("${targetName}DeviceTest")
+            if ("withHostTest" in configurationCalls) add("${targetName}HostTest")
+            if ("withDeviceTest" in configurationCalls) add("${targetName}DeviceTest")
         }
         else -> listOf("${targetName}Test")
-    }
-
-    private companion object {
-        val WITH_HOST_TEST = Regex("""\bwithHostTest\b""")
-        val WITH_DEVICE_TEST = Regex("""\bwithDeviceTest\b""")
     }
 }
 
@@ -96,15 +102,15 @@ enum class KmpTargetPreset(
  * A KMP target declared in (or selected for) a build script.
  *
  * @param name Target name; differs from [KmpTargetPreset.defaultName] for e.g. `jvm("desktop")`
- * @param configuration Text of the target's configuration block, empty if there is none
+ * @param configurationCalls Names of the functions called in the target's configuration block
  */
 data class KmpTarget(
     val preset: KmpTargetPreset,
     val name: String = preset.defaultName,
-    val configuration: String = ""
+    val configurationCalls: Set<String> = emptySet()
 ) {
     val mainSourceSet: String get() = "${name}Main"
-    val testSourceSets: List<String> get() = preset.testSourceSets(name, configuration)
+    val testSourceSets: List<String> get() = preset.testSourceSets(name, configurationCalls)
 }
 
 /**
@@ -182,214 +188,5 @@ object KmpSourceSetPlanner {
             if (!isTest || includeTests) add(name, 1, isTest)
         }
         return result.values.toList()
-    }
-}
-
-/**
- * Text-based reader of the `kotlin {}` block of a `build.gradle.kts` script.
- *
- * It does not evaluate the script: targets are recognised by their DSL calls (`jvm()`, `iosArm64()`,
- * `js { … }`, `android { … }`, …) placed directly in the `kotlin {}` block, including calls nested in
- * expressions such as `listOf(iosX64(), iosArm64()).forEach { … }`. Comments are ignored.
- */
-object KmpBuildScriptParser {
-
-    private val presetsByDslName: Map<String, KmpTargetPreset> =
-        KmpTargetPreset.entries.flatMap { preset -> preset.dslNames.map { it to preset } }.toMap()
-
-    private val kotlinBlockRegex = Regex("""(?<![\w.])kotlin\s*\{""")
-    private val sourceSetsBlockRegex = Regex("""(?<![\w.])sourceSets\s*\{""")
-    private val targetCallRegex =
-        Regex("""(?<![\w.])(${presetsByDslName.keys.joinToString("|")})\b\s*([({])""")
-    private val targetNameRegex = Regex("^\\s*(?:name\\s*=\\s*)?\"([A-Za-z_]\\w*)\"")
-    private val createdByDelegateRegex = Regex("""\bval\s+([A-Za-z_]\w*)\s+by\s+(?:creating|registering)\b""")
-    private val createdByCallRegex = Regex("\\b(?:create|register|maybeCreate)\\s*\\(\\s*\"([A-Za-z_]\\w*)\"")
-
-    fun parse(script: String): KmpBuildScriptInfo {
-        val code = ScriptCode(script)
-        // Prefer the outermost `kotlin {}` block, e.g. the top-level one over one nested in `subprojects {}`
-        val kotlinOpen = kotlinBlockRegex.findAll(code.text)
-            .map { it.range.last }
-            .filter { code.isCode(it) }
-            .minByOrNull { code.depthAt(it) }
-            ?: return KmpBuildScriptInfo(kotlinBlockFound = false, targets = emptyList(), customSourceSets = emptyList())
-
-        val bodyStart = kotlinOpen + 1
-        val bodyEnd = code.matchingBrace(kotlinOpen).takeIf { it >= 0 } ?: code.text.length
-        val topLevel = code.topLevelText(bodyStart, bodyEnd)
-
-        return KmpBuildScriptInfo(
-            kotlinBlockFound = true,
-            targets = parseTargets(code, topLevel, bodyStart),
-            customSourceSets = parseCustomSourceSets(code, topLevel, bodyStart)
-        )
-    }
-
-    private fun parseTargets(code: ScriptCode, topLevel: String, offset: Int): List<KmpTarget> {
-        val targets = LinkedHashMap<String, KmpTarget>()
-        for (match in targetCallRegex.findAll(topLevel)) {
-            if (!code.isCode(offset + match.range.first)) continue
-            val preset = presetsByDslName.getValue(match.groupValues[1])
-            var cursor = match.groups[2]!!.range.first
-            var name = preset.defaultName
-
-            if (topLevel[cursor] == '(') {
-                if (preset.requiresBlock) continue
-                val close = code.matchingParen(offset + cursor) - offset
-                if (close < 0) continue
-                targetNameRegex.find(topLevel.substring(cursor + 1, close))?.let { name = it.groupValues[1] }
-                cursor = close + 1
-                while (cursor < topLevel.length && topLevel[cursor].isWhitespace()) cursor++
-            }
-
-            var configuration = ""
-            if (cursor < topLevel.length && topLevel[cursor] == '{') {
-                val open = offset + cursor
-                val close = code.matchingBrace(open).takeIf { it >= 0 } ?: code.text.length
-                configuration = code.text.substring(open + 1, close)
-            } else if (preset.requiresBlock) {
-                continue
-            }
-
-            // A target may be declared more than once, e.g. `jvm()` and later `jvm { … }`
-            val existing = targets[name]
-            targets[name] = if (existing == null) {
-                KmpTarget(preset, name, configuration)
-            } else {
-                existing.copy(configuration = existing.configuration + "\n" + configuration)
-            }
-        }
-        return targets.values.toList()
-    }
-
-    private fun parseCustomSourceSets(code: ScriptCode, topLevel: String, offset: Int): List<String> {
-        val open = sourceSetsBlockRegex.findAll(topLevel)
-            .map { offset + it.range.last }
-            .firstOrNull { code.isCode(it) }
-            ?: return emptyList()
-        val close = code.matchingBrace(open).takeIf { it >= 0 } ?: code.text.length
-        val body = code.text.substring(open + 1, close)
-        return (createdByDelegateRegex.findAll(body) + createdByCallRegex.findAll(body))
-            .map { it.groupValues[1] }
-            .distinct()
-            .toList()
-    }
-}
-
-/**
- * A script with comments blanked out (offsets preserved), aware of string/char literals and brace depth.
- */
-internal class ScriptCode(source: String) {
-    /** The source with comments replaced by spaces; line breaks are kept. */
-    val text: String
-    private val literal = BooleanArray(source.length)
-    private val depth = IntArray(source.length)
-
-    init {
-        val chars = source.toCharArray()
-        val n = source.length
-        fun blank(from: Int, to: Int) {
-            for (k in from until to) if (chars[k] != '\n') chars[k] = ' '
-        }
-        fun markLiteral(from: Int, to: Int) {
-            for (k in from until to) literal[k] = true
-        }
-
-        var i = 0
-        while (i < n) {
-            val c = source[i]
-            when {
-                source.startsWith("//", i) -> {
-                    val end = source.indexOf('\n', i).let { if (it < 0) n else it }
-                    blank(i, end)
-                    i = end
-                }
-                source.startsWith("/*", i) -> {
-                    // Kotlin block comments can be nested
-                    var nesting = 0
-                    var j = i
-                    while (j < n) {
-                        when {
-                            source.startsWith("/*", j) -> { nesting++; j += 2 }
-                            source.startsWith("*/", j) -> { nesting--; j += 2; if (nesting == 0) break }
-                            else -> j++
-                        }
-                    }
-                    j = minOf(j, n)
-                    blank(i, j)
-                    i = j
-                }
-                source.startsWith("\"\"\"", i) -> {
-                    var j = source.indexOf("\"\"\"", i + 3).let { if (it < 0) n else it + 3 }
-                    while (j < n && source[j] == '"') j++
-                    markLiteral(i, j)
-                    i = j
-                }
-                c == '"' || c == '\'' -> {
-                    var j = i + 1
-                    while (j < n && source[j] != c && source[j] != '\n') {
-                        if (source[j] == '\\') j++
-                        j++
-                    }
-                    j = minOf(j + 1, n)
-                    markLiteral(i, j)
-                    i = j
-                }
-                else -> i++
-            }
-        }
-        text = String(chars)
-
-        var d = 0
-        for (k in 0 until n) {
-            depth[k] = d
-            if (literal[k]) continue
-            when (text[k]) {
-                '{' -> d++
-                '}' -> d = maxOf(0, d - 1)
-            }
-        }
-    }
-
-    /** Whether the character at [index] is code (not inside a string or char literal). */
-    fun isCode(index: Int): Boolean = !literal[index]
-
-    /** Brace depth before the character at [index]. */
-    fun depthAt(index: Int): Int = depth[index]
-
-    /** Index of the `}` closing the `{` at [open], or -1. */
-    fun matchingBrace(open: Int): Int {
-        val inner = depth[open] + 1
-        for (i in open + 1 until text.length) {
-            if (!literal[i] && text[i] == '}' && depth[i] == inner) return i
-        }
-        return -1
-    }
-
-    /** Index of the `)` closing the `(` at [open], or -1. */
-    fun matchingParen(open: Int): Int {
-        var level = 0
-        for (i in open until text.length) {
-            if (literal[i]) continue
-            when (text[i]) {
-                '(' -> level++
-                ')' -> if (--level == 0) return i
-            }
-        }
-        return -1
-    }
-
-    /**
-     * The text in `[start, end)` where everything nested in braces deeper than [start]'s depth is blanked,
-     * so that only the block's own statements remain visible. Offsets are preserved.
-     */
-    fun topLevelText(start: Int, end: Int): String {
-        if (start >= end) return ""
-        val level = depth[start]
-        val chars = CharArray(end - start) { k ->
-            val c = text[start + k]
-            if (depth[start + k] == level || c == '\n') c else ' '
-        }
-        return String(chars)
     }
 }

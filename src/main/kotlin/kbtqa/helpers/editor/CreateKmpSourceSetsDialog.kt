@@ -106,8 +106,8 @@ class CreateKmpSourceSetsDialog(
             else listOf(KmpTarget(preset))
         }
 
-        candidates.groupBy { it.preset.group }.forEach { (group, targets) ->
-            panel.add(TitledSeparator(group.displayName).apply { alignmentX = JComponent.LEFT_ALIGNMENT })
+        candidates.groupBy { it.preset.section }.forEach { (section, targets) ->
+            panel.add(TitledSeparator(section).apply { alignmentX = JComponent.LEFT_ALIGNMENT })
             targets.forEach { target ->
                 val label = if (target.name == target.preset.defaultName) target.preset.dslDeclaration
                 else "${target.name} — ${target.preset.dslDeclaration}"

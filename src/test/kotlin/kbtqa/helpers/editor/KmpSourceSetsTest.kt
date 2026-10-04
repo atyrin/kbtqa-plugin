@@ -1,167 +1,20 @@
 package kbtqa.helpers.editor
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Tests for [KmpBuildScriptParser] and [KmpSourceSetPlanner].
+ * Tests for [KmpSourceSetPlanner] and the KMP target/source set model.
  */
 class KmpSourceSetsTest {
 
-    private fun targetNames(script: String) = KmpBuildScriptParser.parse(script).targets.map { it.name }
-
-    private fun planNames(script: String, includeTests: Boolean = true): List<String> {
-        val info = KmpBuildScriptParser.parse(script)
-        return KmpSourceSetPlanner.plan(info.targets, info.customSourceSets, includeTests).map { it.name }
-    }
-
-    @Test
-    fun `no kotlin block`() {
-        val info = KmpBuildScriptParser.parse("plugins { kotlin(\"multiplatform\") }\n")
-        assertFalse(info.kotlinBlockFound)
-        assertTrue(info.targets.isEmpty())
-    }
-
-    @Test
-    fun `typical targets are detected in declaration order`() {
-        val script = """
-            plugins {
-                kotlin("multiplatform") version "2.2.20"
-            }
-            kotlin {
-                jvmToolchain(17)
-                jvm()
-                js { browser() }
-                @OptIn(ExperimentalWasmDsl::class)
-                wasmJs { browser() }
-                iosArm64()
-                iosSimulatorArm64()
-                linuxX64 {
-                    binaries { executable() }
-                }
-            }
-        """.trimIndent()
-        assertEquals(
-            listOf("jvm", "js", "wasmJs", "iosArm64", "iosSimulatorArm64", "linuxX64"),
-            targetNames(script)
-        )
-    }
-
-    @Test
-    fun `targets inside listOf are detected`() {
-        val script = """
-            kotlin {
-                listOf(iosX64(), iosArm64(), iosSimulatorArm64()).forEach {
-                    it.binaries.framework { baseName = "shared" }
-                }
-            }
-        """.trimIndent()
-        assertEquals(listOf("iosX64", "iosArm64", "iosSimulatorArm64"), targetNames(script))
-    }
-
-    @Test
-    fun `commented out targets are ignored`() {
-        val script = """
-            kotlin {
-                jvm()
-                // iosArm64()
-                /* linuxX64()
-                   /* nested */ mingwX64() */
-                js() // wasmJs()
-            }
-        """.trimIndent()
-        assertEquals(listOf("jvm", "js"), targetNames(script))
-    }
-
-    @Test
-    fun `custom target names`() {
-        val script = """
-            kotlin {
-                jvm("desktop")
-                macosArm64(name = "native") { }
-                js(IR) { nodejs() }
-            }
-        """.trimIndent()
-        assertEquals(listOf("desktop", "native", "js"), targetNames(script))
-    }
-
-    @Test
-    fun `nested calls and strings do not produce targets`() {
-        val script = """
-            kotlin {
-                jvm {
-                    compilations.all { compilerOptions { jvmTarget.set(JvmTarget.JVM_17) } }
-                }
-                sourceSets {
-                    jvmMain.dependencies { implementation("x:js(1)") }
-                }
-                val text = "iosArm64() { }"
-            }
-        """.trimIndent()
-        assertEquals(listOf("jvm"), targetNames(script))
-    }
-
-    @Test
-    fun `android targets`() {
-        val agpLibrary = """
-            kotlin {
-                android {
-                    namespace = "org.example"
-                    withHostTest { }
-                }
-            }
-            android { compileSdk = 35 }
-        """.trimIndent()
-        val target = KmpBuildScriptParser.parse(agpLibrary).targets.single()
-        assertEquals(KmpTargetPreset.ANDROID_LIBRARY, target.preset)
-        assertEquals(listOf("androidHostTest"), target.testSourceSets)
-
-        val legacy = KmpBuildScriptParser.parse("kotlin { androidTarget() }").targets.single()
-        assertEquals(KmpTargetPreset.ANDROID_TARGET, legacy.preset)
-        assertEquals(listOf("androidUnitTest", "androidInstrumentedTest"), legacy.testSourceSets)
-    }
-
-    @Test
-    fun `top-level android block outside kotlin is not a target`() {
-        assertEquals(listOf("jvm"), targetNames("android { }\nkotlin { jvm() }"))
-    }
-
-    @Test
-    fun `repeated declaration is merged`() {
-        val info = KmpBuildScriptParser.parse("kotlin {\n jvm()\n jvm { withJava() }\n }")
-        assertEquals(1, info.targets.size)
-        assertTrue(info.targets.single().configuration.contains("withJava"))
-    }
-
-    @Test
-    fun `custom source sets are detected`() {
-        val script = """
-            kotlin {
-                jvm()
-                sourceSets {
-                    val commonMain by getting
-                    val jvmAndJsMain by creating { dependsOn(commonMain) }
-                    create("integrationTest")
-                }
-            }
-        """.trimIndent()
-        assertEquals(listOf("jvmAndJsMain", "integrationTest"), KmpBuildScriptParser.parse(script).customSourceSets)
-    }
-
     @Test
     fun `plan follows default hierarchy template`() {
-        val script = """
-            kotlin {
-                jvm()
-                js()
-                iosArm64()
-                iosSimulatorArm64()
-                macosArm64()
-                linuxX64()
-            }
-        """.trimIndent()
+        val targets = listOf(
+            KmpTargetPreset.JVM, KmpTargetPreset.JS, KmpTargetPreset.IOS_ARM64,
+            KmpTargetPreset.IOS_SIMULATOR_ARM64, KmpTargetPreset.MACOS_ARM64, KmpTargetPreset.LINUX_X64
+        ).map { KmpTarget(it) }
         assertEquals(
             listOf(
                 "commonMain", "jvmMain",
@@ -170,7 +23,21 @@ class KmpSourceSetsTest {
                 "macosMain", "macosArm64Main",
                 "linuxMain", "linuxX64Main"
             ),
-            planNames(script, includeTests = false)
+            KmpSourceSetPlanner.plan(targets, includeTests = false).map { it.name }
+        )
+    }
+
+    @Test
+    fun `android test source sets`() {
+        assertEquals(
+            listOf("androidUnitTest", "androidInstrumentedTest"),
+            KmpTarget(KmpTargetPreset.ANDROID_TARGET).testSourceSets
+        )
+        assertEquals(emptyList<String>(), KmpTarget(KmpTargetPreset.ANDROID_LIBRARY).testSourceSets)
+        assertEquals(
+            listOf("androidHostTest", "androidDeviceTest"),
+            KmpTarget(KmpTargetPreset.ANDROID_LIBRARY, configurationCalls = setOf("withHostTest", "withDeviceTest"))
+                .testSourceSets
         )
     }
 
@@ -207,5 +74,14 @@ class KmpSourceSetsTest {
         assertEquals("src/iosArm64Main/kotlin/org/example/IosArm64Main.kt", sourceSet.relativeFilePath("org.example"))
         assertEquals("class IosArm64Main\n", sourceSet.fileContent(""))
         assertEquals("package org.example\n\nclass IosArm64Main\n", sourceSet.fileContent("org.example"))
+    }
+
+    @Test
+    fun `targets directly under common get their own sections`() {
+        assertEquals(
+            listOf("JVM & Android", "Web", "WASI", "iOS", "macOS", "tvOS", "watchOS", "Linux", "Windows (MinGW)", "Android Native"),
+            KmpTargetPreset.entries.map { it.section }.distinct()
+        )
+        assertEquals(KmpGroup.COMMON, KmpTargetPreset.WASM_WASI.group)
     }
 }

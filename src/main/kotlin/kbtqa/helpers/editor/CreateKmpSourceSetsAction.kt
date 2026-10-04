@@ -5,12 +5,12 @@ import com.intellij.notification.NotificationType
 import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.diagnostic.thisLogger
-import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VfsUtil
-import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.psi.PsiDocumentManager
+import org.jetbrains.kotlin.psi.KtFile
 import java.io.IOException
 
 /**
@@ -38,13 +38,12 @@ class CreateKmpSourceSetsAction : AnAction(
 
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
-        val buildFile = e.getData(CommonDataKeys.VIRTUAL_FILE) ?: return
-        val moduleDir = buildFile.parent ?: return
+        val ktFile = e.getData(CommonDataKeys.PSI_FILE) as? KtFile ?: return
+        val moduleDir = ktFile.virtualFile?.parent ?: return
 
-        // Prefer the document so that unsaved edits of the build script are taken into account
-        val script = FileDocumentManager.getInstance().getDocument(buildFile)?.text
-            ?: VfsUtilCore.loadText(buildFile)
-        val dialog = CreateKmpSourceSetsDialog(project, moduleDir, KmpBuildScriptParser.parse(script))
+        // Make the PSI reflect the latest (possibly unsaved) edits of the build script
+        PsiDocumentManager.getInstance(project).commitAllDocuments()
+        val dialog = CreateKmpSourceSetsDialog(project, moduleDir, KmpBuildScriptParser.parse(ktFile))
         if (!dialog.showAndGet()) return
 
         createSourceSets(project, moduleDir, dialog.plannedSourceSets, dialog.packageName)
