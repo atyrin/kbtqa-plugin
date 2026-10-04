@@ -53,14 +53,8 @@ class ConfigureRepositoriesAction :
             configureRepositoriesInParentBlock(
                 ktFile, factory, PLUGIN_MANAGEMENT_BLOCK_NAME, PLUGIN_REPOSITORIES
             ) { content ->
-                val newBlock = factory.createExpression(content)
-                val anchor = ktFile.firstChild
-                val addedBlock = if (anchor != null) {
-                    ktFile.addBefore(newBlock, anchor)
-                } else {
-                    ktFile.add(newBlock)
-                }
-                ktFile.addAfter(factory.createNewLine(2), addedBlock)
+                // Gradle requires pluginManagement to be the first block of the settings script
+                ktFile.insertTopLevelBlock(factory, factory.createExpression(content))
             }
             // Configure dependencyResolutionManagement block
             configureRepositoriesInParentBlock(
@@ -146,8 +140,7 @@ class ConfigureRepositoriesAction :
         if (lambdaBody != null) {
             val formattedRepositories = repositories.lines().joinToString("\n") { "    $it" }
             val repositoriesBlock = factory.createExpression("repositories {\n$formattedRepositories\n}")
-            lambdaBody.addBefore(repositoriesBlock, lambdaBody.lastChild)
-            lambdaBody.addBefore(factory.createNewLine(), lambdaBody.lastChild)
+            lambdaBody.appendStatement(factory, repositoriesBlock)
         }
     }
 
@@ -175,11 +168,7 @@ class ConfigureRepositoriesAction :
             }
 
             if (shouldAdd) {
-                val anchor = lambdaBody.lastChild
-                if (anchor != null) {
-                    val addedRepo = lambdaBody.addBefore(newRepoExpression, anchor)
-                    lambdaBody.addAfter(factory.createNewLine(), addedRepo)
-                }
+                lambdaBody.appendStatement(factory, newRepoExpression)
             }
         }
     }

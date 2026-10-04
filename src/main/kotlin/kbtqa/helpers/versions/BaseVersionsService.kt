@@ -19,6 +19,7 @@ abstract class BaseVersionsService : VersionsService {
 
     companion object {
         private const val REQUEST_TIMEOUT_SECONDS = 30L
+        private val QUALIFIER_CHUNK_REGEX = Regex("""\d+|\D+""")
         private val httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(REQUEST_TIMEOUT_SECONDS))
             .build()
@@ -106,6 +107,10 @@ abstract class BaseVersionsService : VersionsService {
     /**
      * Compares two version strings for sorting.
      * Returns positive if v1 > v2, negative if v1 < v2, 0 if equal.
+     *
+     * Parts are compared numerically when both are numbers; qualifiers are compared case-insensitively
+     * with embedded numbers compared numerically (`RC10` > `RC2`). A release is newer than its
+     * pre-releases (`2.0.0` > `2.0.0-RC`), but older than a version with an extra number (`2.0` < `2.0.1`).
      */
     protected fun compareVersions(v1: String, v2: String): Int {
         val parts1 = v1.split(".", "-")
@@ -114,20 +119,59 @@ abstract class BaseVersionsService : VersionsService {
         val maxLength = maxOf(parts1.size, parts2.size)
 
         for (i in 0 until maxLength) {
-            val part1 = parts1.getOrNull(i) ?: ""
-            val part2 = parts2.getOrNull(i) ?: ""
-
-            // Try to compare as numbers first
-            val num1 = part1.toIntOrNull()
-            val num2 = part2.toIntOrNull()
+            val part1 = parts1.getOrNull(i)
+            val part2 = parts2.getOrNull(i)
 
             val comparison = when {
-                num1 != null && num2 != null -> num1.compareTo(num2)
-                num1 != null && num2 == null -> 1 // Numbers come after text
-                num1 == null && num2 != null -> -1 // Text comes before numbers
-                else -> part1.compareTo(part2, ignoreCase = true)
+                part1 == null -> -compareToMissingPart(part2!!)
+                part2 == null -> compareToMissingPart(part1)
+                else -> compareParts(part1, part2)
             }
 
+            if (comparison != 0) {
+                return comparison
+            }
+        }
+
+        return 0
+    }
+
+    /**
+     * Compares a part present in only one of the versions with the missing part of the other one:
+     * an extra number makes the version newer, an extra qualifier makes it a pre-release, so older.
+     */
+    private fun compareToMissingPart(part: String): Int = if (part.toLongOrNull() != null) 1 else -1
+
+    private fun compareParts(part1: String, part2: String): Int {
+        // Try to compare as numbers first
+        val num1 = part1.toLongOrNull()
+        val num2 = part2.toLongOrNull()
+
+        return when {
+            num1 != null && num2 != null -> num1.compareTo(num2)
+            num1 != null -> 1 // Numbers come after text
+            num2 != null -> -1 // Text comes before numbers
+            else -> compareQualifiers(part1, part2)
+        }
+    }
+
+    /**
+     * Compares qualifiers such as `Beta1` or `RC10` chunk by chunk, numeric chunks as numbers.
+     */
+    private fun compareQualifiers(qualifier1: String, qualifier2: String): Int {
+        val chunks1 = QUALIFIER_CHUNK_REGEX.findAll(qualifier1).map { it.value }.toList()
+        val chunks2 = QUALIFIER_CHUNK_REGEX.findAll(qualifier2).map { it.value }.toList()
+
+        for (i in 0 until maxOf(chunks1.size, chunks2.size)) {
+            val chunk1 = chunks1.getOrNull(i) ?: return -1
+            val chunk2 = chunks2.getOrNull(i) ?: return 1
+            val num1 = chunk1.toBigIntegerOrNull()
+            val num2 = chunk2.toBigIntegerOrNull()
+            val comparison = if (num1 != null && num2 != null) {
+                num1.compareTo(num2)
+            } else {
+                chunk1.compareTo(chunk2, ignoreCase = true)
+            }
             if (comparison != 0) {
                 return comparison
             }

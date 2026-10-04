@@ -52,6 +52,21 @@ class VersionParsingTest {
     }
 
     @Test
+    fun `release is newer than its pre-releases`() {
+        assertTrue(service.compare("2.0.0", "2.0.0-RC") > 0)
+        assertTrue(service.compare("2.0.0-RC", "2.0.0") < 0)
+        assertTrue(service.compare("9.0.0", "9.0.0-rc-1") > 0)
+        assertTrue(service.compare("2.3.0-dev-1234", "2.3.0") < 0)
+    }
+
+    @Test
+    fun `numbers inside qualifiers are compared as numbers`() {
+        assertTrue(service.compare("2.0.0-RC10", "2.0.0-RC2") > 0)
+        assertTrue(service.compare("2.0.0-Beta2", "2.0.0-Beta") > 0)
+        assertTrue(service.compare("2.3.0-dev-12345", "2.3.0-dev-999") > 0)
+    }
+
+    @Test
     fun `numeric part sorts after a qualifier at the same position`() {
         assertTrue(service.compare("2.2.0-1", "2.2.0-Beta") > 0)
         assertTrue(service.compare("2.2.0-Beta", "2.2.0-1") < 0)
@@ -59,9 +74,9 @@ class VersionParsingTest {
 
     @Test
     fun `maven metadata versions are returned newest first`() {
-        val xml = mavenMetadata("1.9.24", "2.0.0", "2.10.0", "2.9.0", "2.2.20-Beta1", "2.2.20-RC")
+        val xml = mavenMetadata("1.9.24", "2.2.20", "2.0.0", "2.10.0", "2.9.0", "2.2.20-Beta1", "2.2.20-RC", "2.2.20-RC2")
         assertEquals(
-            listOf("2.10.0", "2.9.0", "2.2.20-RC", "2.2.20-Beta1", "2.0.0", "1.9.24"),
+            listOf("2.10.0", "2.9.0", "2.2.20", "2.2.20-RC2", "2.2.20-RC", "2.2.20-Beta1", "2.0.0", "1.9.24"),
             service.parse(xml)
         )
     }
@@ -101,12 +116,13 @@ class VersionParsingTest {
                 {"name": "gradle-9.0.0-rc-1-src.zip"}
               ]},
               {"tag_name": "v8.9", "assets": [{"name": "gradle-8.9-bin.zip", "size": 1}]},
+              {"tag_name": "v9.0.0", "assets": [{"name": "gradle-9.0.0-bin.zip"}]},
               {"tag_name": "no-assets"},
               {"tag_name": "nameless-asset", "assets": [{"size": 1}]}
             ]
         """.trimIndent()
         assertEquals(
-            listOf("9.0.0-rc-1", "8.14.3", "8.9"),
+            listOf("9.0.0", "9.0.0-rc-1", "8.14.3", "8.9"),
             GradleVersionsService().parseVersionsFromJson(json)
         )
     }

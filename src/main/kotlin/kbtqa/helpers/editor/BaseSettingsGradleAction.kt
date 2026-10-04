@@ -4,6 +4,7 @@ import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
+import com.intellij.psi.PsiElement
 import com.intellij.psi.util.PsiTreeUtil
 import org.jetbrains.kotlin.psi.*
 import javax.swing.Icon
@@ -56,6 +57,14 @@ abstract class BaseSettingsGradleAction(
     }
 
     /**
+     * Finds a top-level KtCallExpression (one not nested in another call) by its name in the given PSI file.
+     */
+    protected fun KtFile.findTopLevelBlock(name: String): KtCallExpression? {
+        return PsiTreeUtil.findChildrenOfType(this, KtCallExpression::class.java)
+            .find { it.calleeExpression?.text == name && PsiTreeUtil.getParentOfType(it, KtCallExpression::class.java) == null }
+    }
+
+    /**
      * Adds content to the end of the file with proper spacing.
      */
     protected fun KtFile.addContentToFile(factory: KtPsiFactory, content: String) {
@@ -69,5 +78,35 @@ abstract class BaseSettingsGradleAction(
      */
     protected fun KtFile.hasBlock(blockName: String): Boolean {
         return findBlock(blockName) != null
+    }
+
+    /**
+     * Inserts [element] as a top-level statement of the script, right after the last of the
+     * [afterBlocks] present in the file, or otherwise before the first statement (but after imports).
+     */
+    protected fun KtFile.insertTopLevelBlock(
+        factory: KtPsiFactory,
+        element: PsiElement,
+        afterBlocks: List<String> = emptyList()
+    ): PsiElement {
+        val body = script?.blockExpression ?: return add(element)
+        val anchor = afterBlocks
+            .mapNotNull { findBlock(it) }
+            .maxByOrNull { it.textOffset }
+            ?.let { block -> generateSequence<PsiElement>(block) { it.parent }.firstOrNull { it.parent == body } }
+
+        if (anchor != null) {
+            return body.addAfter(element, anchor).also { body.addBefore(factory.createNewLine(2), it) }
+        }
+        val first = body.firstChild ?: return body.add(element)
+        return body.addBefore(element, first).also { body.addAfter(factory.createNewLine(2), it) }
+    }
+
+    /**
+     * Appends [element] after the last statement of this block, on its own line.
+     */
+    protected fun KtBlockExpression.appendStatement(factory: KtPsiFactory, element: PsiElement): PsiElement {
+        val last = statements.lastOrNull() ?: return add(element)
+        return addAfter(element, last).also { addBefore(factory.createNewLine(), it) }
     }
 }

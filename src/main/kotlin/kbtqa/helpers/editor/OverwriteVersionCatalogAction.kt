@@ -75,8 +75,7 @@ class OverwriteVersionCatalogAction :
     }
 }"""
             val versionCatalogsBlock = factory.createExpression(versionCatalogsContent)
-            lambdaBody.addBefore(versionCatalogsBlock, lambdaBody.lastChild)
-            lambdaBody.addBefore(factory.createNewLine(), lambdaBody.lastChild)
+            lambdaBody.appendStatement(factory, versionCatalogsBlock)
         }
     }
 
@@ -96,8 +95,7 @@ class OverwriteVersionCatalogAction :
     $VERSION_CATALOG_EXAMPLE
 }"""
                 val libsCatalogBlock = factory.createExpression(libsCatalogContent)
-                lambdaBody.addBefore(libsCatalogBlock, lambdaBody.lastChild)
-                lambdaBody.addBefore(factory.createNewLine(), lambdaBody.lastChild)
+                lambdaBody.appendStatement(factory, libsCatalogBlock)
             }
         }
     }

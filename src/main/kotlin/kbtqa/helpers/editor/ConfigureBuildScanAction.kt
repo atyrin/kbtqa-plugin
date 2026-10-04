@@ -16,7 +16,7 @@ class ConfigureBuildScanAction :
 
         private const val DEVELOCITY_BLOCK_NAME = "develocity"
         private const val PLUGINS_BLOCK_NAME = "plugins"
-        private const val PLUGIN_MANAGEMENT_BLOCK_NAME = "pluginManagement"
+        private val PLUGINS_PRECEDING_BLOCK_NAMES = listOf("pluginManagement", "buildscript")
 
         private val DEVELOCITY_CONFIG = """
 develocity {
@@ -51,39 +51,24 @@ develocity {
     }
 
     private fun hasDevelocityPlugin(ktFile: KtFile): Boolean {
-        val pluginsBlock = ktFile.findBlock(PLUGINS_BLOCK_NAME) ?: return false
+        val pluginsBlock = ktFile.findTopLevelBlock(PLUGINS_BLOCK_NAME) ?: return false
         val body = pluginsBlock.lambdaArguments.firstOrNull()?.getLambdaExpression()?.bodyExpression ?: return false
         return body.statements.any { it.text.contains(PLUGIN_ID_WITHOUT_VERSION) }
     }
 
     private fun addDevelocityPlugin(ktFile: KtFile, factory: KtPsiFactory) {
-        val pluginsBlock = ktFile.findBlock(PLUGINS_BLOCK_NAME)
+        // Only the top-level plugins block applies plugins; the one in pluginManagement just declares versions
+        val pluginsBlock = ktFile.findTopLevelBlock(PLUGINS_BLOCK_NAME)
         val pluginDeclaration = factory.createExpression(PLUGIN_ID)
 
         if (pluginsBlock != null) {
             // Existing plugins block found, add our plugin to it
             val body = pluginsBlock.lambdaArguments.firstOrNull()?.getLambdaExpression()?.bodyExpression
-            if (body != null) {
-                // Add the plugin before the closing brace of the block
-                body.addBefore(pluginDeclaration, body.lastChild)
-                body.addBefore(factory.createNewLine(), body.lastChild)
-            }
+            body?.appendStatement(factory, pluginDeclaration)
         } else {
-            // No plugins block found, create one
+            // No plugins block found, create one. Gradle allows only pluginManagement and buildscript before it.
             val newPluginsBlock = factory.createExpression("plugins {\n    ${pluginDeclaration.text}\n}")
-            val pluginManagementBlock = ktFile.findBlock(PLUGIN_MANAGEMENT_BLOCK_NAME)
-
-            if (pluginManagementBlock != null) {
-                // Insert plugins block after pluginManagement block for better structure
-                ktFile.add(factory.createNewLine(2))
-                ktFile.addAfter(newPluginsBlock, pluginManagementBlock)
-                ktFile.addAfter(factory.createNewLine(2), pluginManagementBlock)
-            } else {
-                // No pluginManagement block, insert at the beginning of the file
-                ktFile.add(factory.createNewLine(2))
-                ktFile.addBefore(newPluginsBlock, ktFile.firstChild)
-                ktFile.addBefore(factory.createNewLine(2), ktFile.firstChild)
-            }
+            ktFile.insertTopLevelBlock(factory, newPluginsBlock, afterBlocks = PLUGINS_PRECEDING_BLOCK_NAMES)
         }
     }
 

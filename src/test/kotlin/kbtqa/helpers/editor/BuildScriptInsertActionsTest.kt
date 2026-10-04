@@ -37,12 +37,56 @@ class BuildScriptInsertActionsTest : GradleScriptActionTestCase() {
         assertTrue(statements(result, "publishing", "publications", "create").contains("from(components[\"java\"])"))
     }
 
-    fun testPublishingCreatesPluginsBlockWhenMissing() {
+    fun testPublishingCreatesPluginsBlockInEmptyScript() {
         val result = runAction(AddJvmPublishingAction(), "build.gradle.kts", "<caret>")
 
-        assertEquals(1, result.occurrences("`maven-publish`"))
-        assertEquals(1, result.occurrences("publishing {"))
+        assertEquals(listOf("plugins", "publishing"), topLevelCalls(result))
         assertEquals(listOf("`maven-publish`"), statements(result, "plugins"))
+    }
+
+    fun testPublishingCreatesPluginsBlockAtTheTop() {
+        val result = runAction(
+            AddJvmPublishingAction(), "build.gradle.kts", """
+            group = "org.example"
+
+            dependencies { }
+            <caret>
+            """.trimIndent()
+        )
+
+        assertEquals(listOf("plugins", "dependencies", "publishing"), topLevelCalls(result))
+        assertTrue(result.startsWith("plugins {"))
+    }
+
+    fun testPublishingPluginsBlockGoesAfterImportsAndBuildscript() {
+        val result = runAction(
+            AddJvmPublishingAction(), "build.gradle.kts", """
+            import java.io.File
+
+            buildscript {
+                repositories { mavenCentral() }
+            }
+
+            group = "org.example"
+            <caret>
+            """.trimIndent()
+        )
+
+        assertTrue(result.startsWith("import java.io.File\n"))
+        assertEquals(listOf("buildscript", "plugins", "publishing"), topLevelCalls(result))
+        assertTrue(result.indexOf("plugins {") < result.indexOf("group = "))
+    }
+
+    fun testPublishingIsNotInsertedAbovePluginsBlock() {
+        val result = runAction(
+            AddJvmPublishingAction(), "build.gradle.kts", """
+            <caret>plugins {
+                kotlin("jvm") version "2.2.20"
+            }
+            """.trimIndent()
+        )
+
+        assertEquals(listOf("plugins", "publishing"), topLevelCalls(result))
     }
 
     fun testExistingPublishingSetupIsKept() {

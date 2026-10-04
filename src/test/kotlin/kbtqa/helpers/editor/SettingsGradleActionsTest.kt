@@ -52,19 +52,37 @@ class SettingsGradleActionsTest : GradleScriptActionTestCase() {
             """.trimIndent()
         )
 
-        val pluginRepositories = statements(result, "pluginManagement", "repositories")
-        assertEquals(1, pluginRepositories.count { it == "gradlePluginPortal()" })
+        // Missing repositories are appended; the one with a trailing slash is not duplicated
         assertEquals(
-            "Trailing slash must not cause a duplicate",
-            1, pluginRepositories.count { it.contains("maven/dev") }
+            listOf(
+                "gradlePluginPortal()",
+                "maven(\"https://redirector.kotlinlang.org/maven/dev/\")",
+                "mavenCentral()",
+                "maven(\"https://redirector.kotlinlang.org/maven/bootstrap\")",
+                "maven(\"https://redirector.kotlinlang.org/maven/experimental\")",
+                "google()"
+            ),
+            statements(result, "pluginManagement", "repositories")
         )
-        assertEquals(6, pluginRepositories.size)
 
         assertEquals(
-            setOf("repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)", "repositories"),
-            statements(result, "dependencyResolutionManagement").map { it.substringBefore(" {") }.toSet()
+            listOf("repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)", "repositories"),
+            statements(result, "dependencyResolutionManagement").map { it.substringBefore(" {") }
         )
         assertEquals(kotlinRepositories, statements(result, "dependencyResolutionManagement", "repositories"))
+    }
+
+    fun testRepositoriesBlocksGoAfterImports() {
+        val result = runAction(
+            ConfigureRepositoriesAction(), "settings.gradle.kts", """
+            import java.io.File
+
+            rootProject.name = "sample"
+            """.trimIndent()
+        )
+
+        assertTrue(result.startsWith("import java.io.File\n"))
+        assertEquals(listOf("pluginManagement", "dependencyResolutionManagement"), topLevelCalls(result))
     }
 
     fun testConfigureRepositoriesInSettingsIsIdempotent() {
@@ -120,16 +138,60 @@ class SettingsGradleActionsTest : GradleScriptActionTestCase() {
         assertTrue(statements(result, "develocity", "buildScan").contains("termsOfUseAgree.set(\"yes\")"))
     }
 
+    fun testBuildScanPluginsBlockGoesBeforeOtherStatements() {
+        val result = runAction(
+            ConfigureBuildScanAction(), "settings.gradle.kts", """
+            rootProject.name = "sample"
+            include(":app")
+            """.trimIndent()
+        )
+
+        assertEquals(listOf("plugins", "include", "develocity"), topLevelCalls(result))
+        assertTrue(result.startsWith("plugins {"))
+        assertTrue(result.indexOf("}") < result.indexOf("rootProject.name"))
+    }
+
+    fun testBuildScanPluginsBlockGoesAfterImports() {
+        val result = runAction(
+            ConfigureBuildScanAction(), "settings.gradle.kts", """
+            import java.io.File
+
+            rootProject.name = "sample"
+            """.trimIndent()
+        )
+
+        assertTrue(result.startsWith("import java.io.File\n"))
+        assertEquals(listOf("plugins", "develocity"), topLevelCalls(result))
+        assertTrue(result.indexOf("plugins {") < result.indexOf("rootProject.name"))
+    }
+
     fun testBuildScanPluginsBlockGoesAfterPluginManagement() {
         val result = runAction(
             ConfigureBuildScanAction(), "settings.gradle.kts", """
             pluginManagement {
                 repositories { gradlePluginPortal() }
             }
+            include(":app")
             """.trimIndent()
         )
 
+        assertEquals(listOf("pluginManagement", "plugins", "include", "develocity"), topLevelCalls(result))
+    }
+
+    fun testBuildScanPluginIsNotAddedToPluginManagementPlugins() {
+        val result = runAction(
+            ConfigureBuildScanAction(), "settings.gradle.kts", """
+            pluginManagement {
+                plugins {
+                    kotlin("jvm") version "2.2.20"
+                }
+            }
+            """.trimIndent()
+        )
+
+        assertEquals(listOf("kotlin(\"jvm\") version \"2.2.20\""), statements(result, "pluginManagement", "plugins"))
         assertEquals(listOf("pluginManagement", "plugins", "develocity"), topLevelCalls(result))
+        assertTrue(result.contains("}\n\nplugins {\n    id(\"com.gradle.develocity\")"))
     }
 
     fun testBuildScanPluginIsAddedToExistingPluginsBlock() {
@@ -143,11 +205,11 @@ class SettingsGradleActionsTest : GradleScriptActionTestCase() {
 
         assertEquals(listOf("plugins", "develocity"), topLevelCalls(result))
         assertEquals(
-            setOf(
+            listOf(
                 "id(\"org.gradle.toolchains.foojay-resolver-convention\") version \"1.0.0\"",
                 "id(\"com.gradle.develocity\") version (\"4.3.3\")"
             ),
-            statements(result, "plugins").toSet()
+            statements(result, "plugins")
         )
     }
 
@@ -212,8 +274,8 @@ class SettingsGradleActionsTest : GradleScriptActionTestCase() {
 
         assertEquals(listOf("dependencyResolutionManagement"), topLevelCalls(result))
         assertEquals(
-            setOf("repositories", "versionCatalogs"),
-            statements(result, "dependencyResolutionManagement").map { it.substringBefore(" {") }.toSet()
+            listOf("repositories", "versionCatalogs"),
+            statements(result, "dependencyResolutionManagement").map { it.substringBefore(" {") }
         )
         assertEquals(
             listOf("version(\"kotlin\", \"new-version\")"),
@@ -233,7 +295,7 @@ class SettingsGradleActionsTest : GradleScriptActionTestCase() {
         )
 
         val catalogs = statements(result, "dependencyResolutionManagement", "versionCatalogs")
-        assertEquals(setOf("create(\"tools\")", "create(\"libs\")"), catalogs.map { it.substringBefore(" {") }.toSet())
+        assertEquals(listOf("create(\"tools\")", "create(\"libs\")"), catalogs.map { it.substringBefore(" {") })
     }
 
     fun testExistingLibsCatalogIsKept() {
