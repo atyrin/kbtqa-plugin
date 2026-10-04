@@ -2,6 +2,7 @@ package kbtqa.helpers.versions
 
 import com.intellij.openapi.components.Service
 import kotlinx.serialization.json.*
+import org.jetbrains.annotations.VisibleForTesting
 
 /**
  * Service that retrieves available Gradle versions from GitHub releases.
@@ -42,13 +43,15 @@ class GradleVersionsService : BaseVersionsService(), PaginatedVersionsService {
         return PaginatedVersionsService.PaginatedResult(versions, prevUrl, nextUrl)
     }
 
-    private fun parseLinkUrl(linkHeader: String?, rel: String): String? {
+    @VisibleForTesting
+    internal fun parseLinkUrl(linkHeader: String?, rel: String): String? {
         if (linkHeader == null) return null
         val regex = Regex("""<([^>]+)>;\s*rel="$rel"""")
         return regex.find(linkHeader)?.groupValues?.get(1)
     }
 
-    private fun parseVersionsFromJson(jsonContent: String): List<String> {
+    @VisibleForTesting
+    internal fun parseVersionsFromJson(jsonContent: String): List<String> {
         return try {
             val json = Json { ignoreUnknownKeys = true }
             val releases = json.parseToJsonElement(jsonContent).jsonArray

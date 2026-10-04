@@ -13,6 +13,7 @@ import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.vfs.LocalFileSystem
+import org.jetbrains.annotations.VisibleForTesting
 import java.io.File
 import java.io.FileOutputStream
 import java.nio.file.Files
@@ -119,7 +120,8 @@ class PrepareUploadAction :
      * @param excludedPaths Set of relative paths to exclude from the archive
      * @param indicator Progress indicator for the operation
      */
-    private fun createZipArchive(projectDir: File, excludedPaths: Set<String>, indicator: ProgressIndicator): File {
+    @VisibleForTesting
+    internal fun createZipArchive(projectDir: File, excludedPaths: Set<String>, indicator: ProgressIndicator): File {
         val projectName = projectDir.name
         val zipFile = File(projectDir.parentFile, "${projectName}.zip")
         
