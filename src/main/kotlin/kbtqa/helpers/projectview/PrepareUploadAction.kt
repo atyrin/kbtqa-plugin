@@ -145,7 +145,7 @@ class PrepareUploadAction :
             filesToZip.forEachIndexed { index, file ->
                 if (indicator.isCanceled) return@use
                 
-                val relativePath = file.relativeTo(projectDir).path
+                val relativePath = file.relativeTo(projectDir).invariantSeparatorsPath
                 indicator.text2 = "Zipping: $relativePath"
                 indicator.fraction = (index.toDouble() / totalFiles) * 0.9
                 
@@ -177,7 +177,7 @@ class PrepareUploadAction :
         
         dir.listFiles()?.forEach { file ->
             // Calculate relative path for exclusion check (applies to both directories and files)
-            val relativePath = file.relativeTo(projectRoot).path
+            val relativePath = file.relativeTo(projectRoot).invariantSeparatorsPath
             if (relativePath in excludedPaths) return@forEach
             
             result.add(file)
