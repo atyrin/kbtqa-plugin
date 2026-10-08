@@ -26,8 +26,9 @@
         Java, and switches an existing project between these setups. Only the parts that define a setup are
         rewritten; kapt executions, plugin configuration and other plugins are kept. The manual setups add a
         missing <code>kotlin-stdlib</code>.</li>
-    <li><em>Choose Kotlin version</em> (Alt+Enter on <code>&lt;kotlin.version&gt;</code>) sets the property from Kotlin
-        versions grouped by the <code>dev</code> and <code>experimental</code> repositories and Maven Central.</li>
+    <li><em>Choose Kotlin version</em>, a context action on <code>&lt;kotlin.version&gt;</code> (Show Context Actions:
+        Alt+Enter on Windows and Linux, ⌥⏎ on macOS), sets the property from Kotlin versions grouped by the
+        <code>dev</code> and <code>experimental</code> repositories and Maven Central.</li>
     <li><em>Configure JDK Toolchain</em> pins the compilation JDK with <code>maven-toolchains-plugin</code>, adding
         whatever part of the setup is missing and keeping the rest. The JDKs themselves are described in a
         <code>toolchains.xml</code>.</li>

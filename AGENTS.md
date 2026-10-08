@@ -10,7 +10,7 @@ projects. Four feature areas:
    repositories, dependencies, compiler options, publishing, build scan, build cache,
    `gradle.properties` entries, version catalog; for `pom.xml` — properties, repositories, the
    Kotlin plugin setup (smart defaults or manual), Kotlin compiler plugins and the JDK toolchain, plus
-   an Alt+Enter intention that picks `kotlin.version` from the dev, experimental and Maven Central builds.
+   a context action (intention) that picks `kotlin.version` from the dev, experimental and Maven Central builds.
 2. **Project-view actions** — exclude/delete cache directories, and _Prepare Upload_ (zip a project as a
    reproducer, honouring `.gitignore`).
 3. **Tool versions** — `Tools ▸ Show Tool Versions`, fetching the latest KGP, AGP, KSP, Dokka, Gradle
