@@ -5,7 +5,8 @@ import java.io.File
 
 /**
  * Scans a project directory for the items offered by [ExcludeDirectoriesDialog]:
- * cache and IDE directories, build directories of Gradle modules, default excluded files,
+ * cache and IDE directories, build directories of Gradle modules and target directories of
+ * Maven modules, default excluded files,
  * and git-ignored directories and files (the latter grouped by the pattern that matched them).
  *
  * @param projectDir The project root directory
@@ -28,6 +29,7 @@ internal class ExcludableItemsCollector(
      * - .idea, .junie directories: only at project root level
      * - local.properties file: only at project root level
      * - build directory: only at the same level as build.gradle or build.gradle.kts
+     * - target directory: only at the same level as pom.xml
      */
     fun collect(): List<ExcludableItem> {
         val result = mutableListOf<ExcludableItem>()
@@ -104,15 +106,9 @@ internal class ExcludableItemsCollector(
                             category = getCategoryForDirectory(file.name)
                         ))
                     }
-                    // Show build directories in Gradle module directories
-                    "build" if isGradleModuleDirectory(dir) -> {
-                        target.add(ExcludableItem(
-                            relativePath = childRelativePath,
-                            isDefaultExclusion = true,
-                            isFile = false,
-                            category = ExclusionCategory.BUILD_OUTPUT
-                        ))
-                    }
+                    // Show build directories in Gradle module directories, and target ones in Maven modules
+                    "build" if isGradleModuleDirectory(dir) -> addBuildOutput(target, childRelativePath)
+                    "target" if isMavenModuleDirectory(dir) -> addBuildOutput(target, childRelativePath)
                     else -> {
                         // Gitignored directory: show as a single item, do not enumerate its contents
                         if (ignoreFilter.match(childRelativePath, isDirectory = true) != null) {
@@ -152,6 +148,15 @@ internal class ExcludableItemsCollector(
         }
     }
 
+    private fun addBuildOutput(target: MutableList<ExcludableItem>, relativePath: String) {
+        target.add(ExcludableItem(
+            relativePath = relativePath,
+            isDefaultExclusion = true,
+            isFile = false,
+            category = ExclusionCategory.BUILD_OUTPUT
+        ))
+    }
+
     /**
      * Determines the category for a directory based on its name.
      */
@@ -180,6 +185,11 @@ internal class ExcludableItemsCollector(
     private fun isGradleModuleDirectory(dir: File): Boolean {
         return dir.listFiles()?.any { it.isFile && it.name in GRADLE_BUILD_SCRIPT_NAMES } == true
     }
+
+    /**
+     * Checks if the given directory is a Maven module directory (contains pom.xml).
+     */
+    private fun isMavenModuleDirectory(dir: File): Boolean = File(dir, MAVEN_BUILD_FILE_NAME).isFile
 }
 
 // Directories that should only be searched at the top project level
@@ -190,3 +200,6 @@ private val TOP_LEVEL_ONLY_FILES = setOf("local.properties")
 
 // Build script files that identify a directory as a Gradle module
 private val GRADLE_BUILD_SCRIPT_NAMES = setOf("build.gradle", "build.gradle.kts")
+
+// The build file that identifies a directory as a Maven module
+private const val MAVEN_BUILD_FILE_NAME = "pom.xml"

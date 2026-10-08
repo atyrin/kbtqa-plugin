@@ -8,7 +8,9 @@ projects. Four feature areas:
 
 1. **Editor helpers** — the _QA Helpers_ context-menu group on Gradle and Maven build files:
    repositories, dependencies, compiler options, publishing, build scan, build cache,
-   `gradle.properties` entries, version catalog, and Kotlin compiler properties for `pom.xml`.
+   `gradle.properties` entries, version catalog; for `pom.xml` — properties, repositories, the
+   Kotlin plugin setup (smart defaults or manual), Kotlin compiler plugins and the JDK toolchain, plus
+   an Alt+Enter intention that picks `kotlin.version` from the dev, experimental and Maven Central builds.
 2. **Project-view actions** — exclude/delete cache directories, and _Prepare Upload_ (zip a project as a
    reproducer, honouring `.gitignore`).
 3. **Tool versions** — `Tools ▸ Show Tool Versions`, fetching the latest KGP, AGP, KSP, Dokka, Gradle
@@ -82,9 +84,6 @@ CI (`.github/workflows/gradle.yml`) runs `./gradlew buildPlugin test` on every p
 ### Testing Strategy
 - Add headless tests under `src/test/kotlin/` for pure logic (parsing, filtering, version resolution);
   see `src/test/kotlin/kbtqa/helpers/projectview/GitignoreFileFilterTest.kt` for the existing pattern
-- PSI-editing logic can also be tested headlessly with the IntelliJ fixture — extend
-  `BasePlatformTestCase`, build the file with `myFixture.configureByText(...)` and assert on
-  `myFixture.editor.document.text`; see `src/test/kotlin/kbtqa/helpers/editor/MavenPropertiesActionTest.kt`
 - Verify UI-bound behaviour in a development IDE instance using `./gradlew runIde`
 - Verify actions work correctly with the relevant build file types (`build.gradle.kts`,
   `settings.gradle.kts`, `gradle.properties`, `pom.xml`) and in the correct context menus

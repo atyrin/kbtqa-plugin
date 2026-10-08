@@ -12,12 +12,28 @@
         <code>experimental</code> repositories in both <code>&lt;repositories&gt;</code> and
         <code>&lt;pluginRepositories&gt;</code>, creating either section when it is missing. Existing sections are
         merged into, so already declared repositories are never duplicated.</li>
-    <li><em>Add Maven Property</em> will suggest a list of well-known properties — Kotlin compiler ones
-        (<code>kotlin.compiler.jvmTarget</code>, <code>languageVersion</code>, <code>apiVersion</code>,
-        <code>jdkRelease</code>, <code>jdkHome</code>, <code>daemon</code>, <code>incremental</code>) and plain Maven
-        ones (<code>maven.compiler.release</code>, <code>maven.compiler.target</code>) — and insert the chosen one
-        into the <code>&lt;properties&gt;</code> section, creating that section when it is missing.</li>
+    <li><em>Add Maven Property</em> will suggest Kotlin and Maven compiler options in titled groups — Kotlin
+        compiler, Kotlin build (daemon, incremental compilation, smart defaults), Maven compiler — and insert the
+        chosen one into the <code>&lt;properties&gt;</code> section, creating that section when it is missing.
+        One more group goes into <code>kotlin-maven-plugin</code> itself: options that have no property counterpart
+        (<code>nowarn</code>, compiler <code>args</code>, <code>jdkToolchain</code>).</li>
+    <li><em>Add Kotlin Compiler Plugin</em> enables <code>spring</code>, <code>all-open</code>, <code>no-arg</code>,
+        <code>lombok</code>, <code>kotlinx-serialization</code>, <code>sam-with-receiver</code> or
+        <code>power-assert</code> in <code>kotlin-maven-plugin</code>, together with its dependency and, where the
+        compiler plugin needs one, an example option.</li>
+    <li><em>Configure Kotlin Plugin</em> sets up <code>kotlin-maven-plugin</code> with smart defaults
+        (<code>&lt;extensions&gt;true&lt;/extensions&gt;</code>), manually for Kotlin only, or manually for Kotlin and
+        Java, and switches an existing project between these setups. Only the parts that define a setup are
+        rewritten; kapt executions, plugin configuration and other plugins are kept. The manual setups add a
+        missing <code>kotlin-stdlib</code>.</li>
+    <li><em>Choose Kotlin version</em> (Alt+Enter on <code>&lt;kotlin.version&gt;</code>) sets the property from Kotlin
+        versions grouped by the <code>dev</code> and <code>experimental</code> repositories and Maven Central.</li>
+    <li><em>Configure JDK Toolchain</em> pins the compilation JDK with <code>maven-toolchains-plugin</code>, adding
+        whatever part of the setup is missing and keeping the rest. The JDKs themselves are described in a
+        <code>toolchains.xml</code>.</li>
 </ul>
+<p>The <code>pom.xml</code> actions format only what they insert; the rest of the file, commented-out lines included,
+    keeps its layout.</p>
 <p>For <code>build.gradle.kts</code>:</p>
 <ul>
     <li><em>Configure maven repositories</em> will add a repositories section with popular maven repositories.</li>
@@ -43,7 +59,7 @@
 <h3>Skills Setup Wizard</h3>
 <p>An action available in the <code>Tools</code> menu. Browse AI agent skill repositories, select skills, and install them into your project. Works with any git repository (GitHub, GitLab, internal repos, etc.). Configure multiple repositories, choose a target directory (e.g., <code>.junie/skills</code> or <code>.claude/skills</code>), and install skills with one click.</p>
 <h3>Prepare project for sharing</h3>
-<p>An action available in the <code>Tools</code> menu and on the root directory context menu. It will compress the project to zip archive excluding <code>.gradle</code>, <code>`.kotlin`</code>, <code>`.idea`</code> folder and <code>build</code> directories.
+<p>An action available in the <code>Tools</code> menu and on the root directory context menu. It will compress the project to zip archive excluding <code>.gradle</code>, <code>`.kotlin`</code>, <code>`.idea`</code> folder, Gradle <code>build</code> and Maven <code>target</code> directories.
     Directories and files matched by the project's <code>.gitignore</code> rules (root and nested files) are excluded by default as well:
     ignored directories are shown as a single entry in the exclusion dialog, ignored files are grouped per pattern (e.g. <code>*.log — 14 files</code>), and every exclusion can be overridden by unchecking it.
     A built-in <code>.gitignore</code> parser is always active; when the Git plugin is enabled, the IDE's VCS ignore state (including global gitignore rules) is consulted as well.</p>

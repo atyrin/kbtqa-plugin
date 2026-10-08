@@ -79,7 +79,11 @@ class ActionAvailabilityTest : BasePlatformTestCase() {
                 AddDependencyAction::class.java, AddCompilerOptionsAction::class.java,
                 AddJvmPublishingAction::class.java, CreateKmpSourceSetsAction::class.java,
                 ConfigureBuildScanAction::class.java, ConfigureBuildCacheAction::class.java,
-                OverwriteVersionCatalogAction::class.java
+                OverwriteVersionCatalogAction::class.java,
+                // Without an event the group offers the pom.xml helpers too, so that they stay discoverable
+                ConfigureMavenRepositoriesAction::class.java, MavenPropertiesAction::class.java,
+                ConfigureKotlinPluginAction::class.java, AddKotlinCompilerPluginAction::class.java,
+                ConfigureToolchainAction::class.java
             ),
             children.filterNot { com.intellij.openapi.actionSystem.Separator::class.java.isAssignableFrom(it) }
         )

@@ -137,7 +137,8 @@ class GitignoreFileFilter(
     /**
      * Walks the project tree collecting `.gitignore` files. Deeper files are parsed later,
      * so their rules take precedence (last match wins). The walk is pruned at directories
-     * from [skipDirNames], at `.git`, and at Gradle module `build` directories.
+     * from [skipDirNames], at `.git`, at Gradle module `build` directories and at Maven module
+     * `target` directories.
      */
     private fun collectGitignoreFiles(dir: File, baseDir: String, target: MutableList<IgnoreRule>) {
         val gitignore = File(dir, GITIGNORE_FILE_NAME)
@@ -149,6 +150,7 @@ class GitignoreFileFilter(
             if (!child.isDirectory) return@forEach
             if (child.name == ".git" || child.name in skipDirNames) return@forEach
             if (child.name == "build" && isGradleModuleDirectory(dir)) return@forEach
+            if (child.name == "target" && isMavenModuleDirectory(dir)) return@forEach
 
             val childBase = if (baseDir.isEmpty()) child.name else "$baseDir/${child.name}"
             collectGitignoreFiles(child, childBase, target)
@@ -162,6 +164,11 @@ class GitignoreFileFilter(
     private fun isGradleModuleDirectory(dir: File): Boolean {
         return dir.listFiles()?.any { it.isFile && it.name in setOf("build.gradle", "build.gradle.kts") } == true
     }
+
+    /**
+     * Checks if the given directory is a Maven module directory (contains pom.xml).
+     */
+    private fun isMavenModuleDirectory(dir: File): Boolean = File(dir, "pom.xml").isFile
 
     private fun parseIgnoreFile(file: File, baseDir: String, target: MutableList<IgnoreRule>) {
         val lines = runCatching { file.readLines() }.getOrElse { return }

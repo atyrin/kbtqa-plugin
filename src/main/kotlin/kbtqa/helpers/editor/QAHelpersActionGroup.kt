@@ -43,8 +43,10 @@ class QAHelpersActionGroup : ActionGroup("QA Helpers", "Helper actions for QA ta
 
     private fun mavenChildren(): Array<AnAction> = arrayOf(
         ConfigureMavenRepositoriesAction(),
-        Separator.create("Maven Properties"),
-        MavenPropertiesAction()
+        MavenPropertiesAction(),
+        ConfigureKotlinPluginAction(),
+        AddKotlinCompilerPluginAction(),
+        ConfigureToolchainAction()
     )
 
     private fun gradleChildren(): Array<AnAction> = arrayOf(
