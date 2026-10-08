@@ -117,7 +117,7 @@ class PrepareUploadAction :
      * Creates a zip archive of the project directory.
      * The zip file is created in the parent directory of the project.
      * @param projectDir The project directory to archive
-     * @param excludedPaths Set of relative paths to exclude from the archive
+     * @param excludedPaths Set of relative paths to exclude from the archive, '/'-separated on every OS
      * @param indicator Progress indicator for the operation
      */
     @VisibleForTesting
@@ -145,7 +145,8 @@ class PrepareUploadAction :
             filesToZip.forEachIndexed { index, file ->
                 if (indicator.isCanceled) return@use
                 
-                val relativePath = file.relativeTo(projectDir).path
+                // Zip entry names take '/' whatever the OS; with '\' other tools see one long file name
+                val relativePath = file.relativeTo(projectDir).invariantSeparatorsPath
                 indicator.text2 = "Zipping: $relativePath"
                 indicator.fraction = (index.toDouble() / totalFiles) * 0.9
                 
@@ -176,8 +177,9 @@ class PrepareUploadAction :
         if (!dir.isDirectory) return
         
         dir.listFiles()?.forEach { file ->
-            // Calculate relative path for exclusion check (applies to both directories and files)
-            val relativePath = file.relativeTo(projectRoot).path
+            // Calculate relative path for exclusion check (applies to both directories and files). The
+            // excluded paths use '/', so on Windows '\' would only ever match ones at the root
+            val relativePath = file.relativeTo(projectRoot).invariantSeparatorsPath
             if (relativePath in excludedPaths) return@forEach
             
             result.add(file)

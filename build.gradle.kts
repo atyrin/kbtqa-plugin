@@ -47,14 +47,7 @@ intellijPlatform {
         }
 
         changeNotes = """
-      Add Kotlin compiler properties and repository configuration for pom.xml<br>
-      Configure the Kotlin Maven plugin with smart defaults or manually, and switch between them<br>
-      Pin the compilation JDK with maven-toolchains-plugin in pom.xml<br>
-      Group Add Maven Property by Kotlin compiler, Kotlin build and Maven compiler; add plugin-only options<br>
-      Enable Kotlin compiler plugins in kotlin-maven-plugin from pom.xml<br>
-      Choose kotlin.version in pom.xml from versions grouped by the dev and experimental repositories and Maven Central<br>
-      Show Maven, maven-compiler-plugin and mvnd versions in Show Tool Versions<br>
-      Exclude Maven target directories from Prepare Upload<br>
+      Add Maven support: pom.xml helpers for repositories, properties, Kotlin plugin, compiler plugins, JDK toolchain and kotlin.version; Maven versions in Show Tool Versions; Prepare Upload leaves out nested build and target directories on Windows too<br>
       Add Create KMP Source Sets QA helper, update the Gradle properties list (1.6.0)<br>
       Add skills wizard (1.5.0)
     """.trimIndent()
