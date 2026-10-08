@@ -32,6 +32,7 @@ import kbtqa.helpers.editor.MavenKotlinPlugin.SOURCE_DIRECTORY_TAG
 import kbtqa.helpers.editor.MavenKotlinPlugin.SOURCE_DIRS_TAG
 import kbtqa.helpers.editor.MavenKotlinPlugin.TEST_SOURCE_DIRECTORY_TAG
 import kbtqa.helpers.editor.MavenKotlinPlugin.VERSION_TAG
+import org.jetbrains.annotations.VisibleForTesting
 
 /**
  * Action that adds a context menu option for pom.xml files to set up the Kotlin Maven plugin in one
@@ -89,7 +90,12 @@ class ConfigureKotlinPluginAction :
         ) { version -> applyMode(project, xmlFile, editor, mode, version) }
     }
 
-    private fun applyMode(
+    /**
+     * What choosing [mode] in the popup does; [compilerPluginVersion] is only used when the Kotlin +
+     * Java setup has to declare the Maven compiler.
+     */
+    @VisibleForTesting
+    internal fun applyMode(
         project: Project,
         xmlFile: XmlFile,
         editor: Editor?,

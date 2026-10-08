@@ -96,6 +96,20 @@ class ExcludableItemsCollectorTest {
     }
 
     @Test
+    fun `target directories are found only next to a pom`() {
+        file("pom.xml")
+        dir("target")
+        file("module/pom.xml")
+        dir("module/target")
+        dir("src/main/kotlin/target")
+
+        val items = collect()
+
+        assertEquals(listOf("module/target", "target"), items.paths())
+        assertTrue(items.all { it.category == ExclusionCategory.BUILD_OUTPUT })
+    }
+
+    @Test
     fun `build directories are not descended into`() {
         file("build.gradle.kts")
         dir("build/.gradle")

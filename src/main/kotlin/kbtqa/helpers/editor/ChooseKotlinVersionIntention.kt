@@ -26,6 +26,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.future.asCompletableFuture
+import org.jetbrains.annotations.VisibleForTesting
 
 /**
  * Intention on the `<kotlin.version>` property of a pom.xml that sets it from a popup of
@@ -42,7 +43,8 @@ class ChooseKotlinVersionIntention : PsiElementBaseIntentionAction(), DumbAware 
         private const val UNAVAILABLE_HINT = "Could not load Kotlin versions: none of the repositories answered"
     }
 
-    private data class VersionItem(val version: String, val channel: String)
+    /** A popup entry: a version and the channel it is listed under. */
+    internal data class VersionItem(val version: String, val channel: String)
 
     override fun getFamilyName(): String = TEXT
 
@@ -100,7 +102,9 @@ class ChooseKotlinVersionIntention : PsiElementBaseIntentionAction(), DumbAware 
         builder.createPopup().showInBestPositionFor(editor)
     }
 
-    private fun setVersion(project: Project, editor: Editor, pointer: SmartPsiElementPointer<XmlTag>, version: String) {
+    /** What choosing [version] in the popup does. */
+    @VisibleForTesting
+    internal fun setVersion(project: Project, editor: Editor, pointer: SmartPsiElementPointer<XmlTag>, version: String) {
         val tag = pointer.element ?: return
         WriteCommandAction.runWriteCommandAction(project, TEXT, null, {
             val target = MavenPomEditing.expandIfSelfClosed(project, tag, tag.name)
@@ -115,7 +119,8 @@ class ChooseKotlinVersionIntention : PsiElementBaseIntentionAction(), DumbAware 
      * The versions of [channels] in their order, each once. One that Maven Central has counts as a
      * Maven Central version; otherwise it goes to the first channel that has it.
      */
-    private fun versionItems(channels: List<VersionChannel>): List<VersionItem> {
+    @VisibleForTesting
+    internal fun versionItems(channels: List<VersionChannel>): List<VersionItem> {
         val owners = mutableMapOf<String, String>()
         // Maven Central, the only channel without a repository to add, claims its versions first
         for (channel in channels.sortedBy { it.repositoryUrl != null }) {

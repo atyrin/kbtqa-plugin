@@ -21,6 +21,7 @@ import kbtqa.helpers.editor.MavenKotlinPlugin.PLUGIN_DEPENDENCIES_ANCHORS
 import kbtqa.helpers.editor.MavenKotlinPlugin.PLUGIN_OPTIONS_TAG
 import kbtqa.helpers.editor.MavenKotlinPlugin.PLUGIN_TAG
 import kbtqa.helpers.editor.MavenKotlinPlugin.VERSION_TAG
+import org.jetbrains.annotations.VisibleForTesting
 
 /**
  * Action that adds a context menu option for pom.xml files to enable one of the Kotlin compiler
@@ -61,10 +62,7 @@ class AddKotlinCompilerPluginAction :
             .setTitle("Select Kotlin Compiler Plugin")
             .setRenderer(SimpleListCellRenderer.create("") { it.name })
             .setItemChosenCallback { compilerPlugin ->
-                val added = MavenPomEditing.editKotlinPlugin(project, editor, xmlFile, "Add Kotlin Compiler Plugin") {
-                    addCompilerPlugin(project, it, compilerPlugin)
-                }
-                if (added) {
+                if (enableCompilerPlugin(project, editor, xmlFile, compilerPlugin)) {
                     showPluginsPopup(project, editor, xmlFile, dataContext)
                 } else {
                     HintManager.getInstance().showErrorHint(editor, MavenKotlinPlugin.NOT_DECLARED_HINT)
@@ -73,6 +71,16 @@ class AddKotlinCompilerPluginAction :
             .createPopup()
             .showInBestPositionFor(dataContext)
     }
+
+    /**
+     * What choosing [compilerPlugin] in the popup does. Returns `false`, changing nothing, when the
+     * pom does not declare `kotlin-maven-plugin`.
+     */
+    @VisibleForTesting
+    internal fun enableCompilerPlugin(project: Project, editor: Editor, xmlFile: XmlFile, compilerPlugin: KotlinCompilerPlugin): Boolean =
+        MavenPomEditing.editKotlinPlugin(project, editor, xmlFile, "Add Kotlin Compiler Plugin") {
+            addCompilerPlugin(project, it, compilerPlugin)
+        }
 
     /**
      * Adds the missing parts of [compilerPlugin] to [plugin] and returns the tag that takes the caret:

@@ -209,6 +209,15 @@ class GitignoreFileFilterTest {
     }
 
     @Test
+    fun `gitignore inside maven target directory is not parsed`() {
+        File(projectDir, "pom.xml").writeText("")
+        writeGitignore("*.bin", dirRelativePath = "target")
+        val filter = filter()
+        assertFalse(filter.hasRules())
+        assertNull(filter.match("target/file.bin", false))
+    }
+
+    @Test
     fun `gitignore inside dot git directory is not parsed`() {
         writeGitignore("everything", dirRelativePath = ".git")
         val filter = filter()
