@@ -14,7 +14,7 @@ data class MavenRepository(val id: String, val url: String) {
 
 /**
  * Catalog of the Kotlin repositories offered by [ConfigureMavenRepositoriesAction], plus the pure
- * helpers it needs. Free of IntelliJ PSI so it can be unit-tested headlessly.
+ * helpers it needs. Plain data and string logic; the PSI work lives in the action.
  *
  * The URLs match the ones [ConfigureRepositoriesAction] writes into Gradle build files, so a
  * project configured either way points at the same places.

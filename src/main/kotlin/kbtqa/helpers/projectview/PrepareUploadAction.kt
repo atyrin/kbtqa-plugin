@@ -26,7 +26,7 @@ import java.util.zip.ZipOutputStream
  * Action that prepares a project for uploading to a bug tracker as a reproducer.
  * 
  * This action performs the following steps:
- * 1. Creates a zip archive of the project, excluding cache folders (.gradle, .kotlin, .idea, build)
+ * 1. Creates a zip archive of the project, excluding cache folders (.gradle, .kotlin, .idea, Gradle build, Maven target)
  *    and items matched by the project's .gitignore rules
  * 2. Reveals the zip file in the system file manager (Finder, Windows Explorer, etc.)
  * 

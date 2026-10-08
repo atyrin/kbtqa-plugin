@@ -31,6 +31,11 @@
                           isLogByDefault="false"/>
         <applicationService
                 serviceImplementation="kbtqa.helpers.skills.SkillsSettingsState"/>
+        <intentionAction>
+            <language>XML</language>
+            <className>kbtqa.helpers.editor.ChooseKotlinVersionIntention</className>
+            <category>KBT QA</category>
+        </intentionAction>
     </extensions>
 
     <extensions defaultExtensionNs="org.jetbrains.kotlin">

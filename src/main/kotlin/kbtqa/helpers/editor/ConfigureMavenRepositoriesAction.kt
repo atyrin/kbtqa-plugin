@@ -37,29 +37,27 @@ class ConfigureMavenRepositoriesAction :
         configureRepositories(project, xmlFile)
     }
 
-    /** Visible for testing: the whole document mutation, independent of the action system. */
-    internal fun configureRepositories(project: Project, xmlFile: XmlFile) {
+    private fun configureRepositories(project: Project, xmlFile: XmlFile) {
         if (!xmlFile.isValid) return
 
         WriteCommandAction.runWriteCommandAction(project, "Configure Repositories", null, {
-            val documentManager = PsiDocumentManager.getInstance(project)
-            // Make the PSI tree match what the user sees before reading it
-            documentManager.getDocument(xmlFile)?.let { documentManager.commitDocument(it) }
-
-            addMissingRepositories(
-                project,
-                xmlFile,
-                MavenRepositories.REPOSITORIES_TAG,
-                MavenRepositories.REPOSITORY_TAG,
-                MavenRepositories.REPOSITORIES_ANCHORS
-            )
-            addMissingRepositories(
-                project,
-                xmlFile,
-                MavenRepositories.PLUGIN_REPOSITORIES_TAG,
-                MavenRepositories.PLUGIN_REPOSITORY_TAG,
-                MavenRepositories.PLUGIN_REPOSITORIES_ANCHORS
-            )
+            val document = PsiDocumentManager.getInstance(project).getDocument(xmlFile) ?: return@runWriteCommandAction
+            MavenPomEditing.editKeepingComments(project, xmlFile, document) {
+                addMissingRepositories(
+                    project,
+                    xmlFile,
+                    MavenRepositories.REPOSITORIES_TAG,
+                    MavenRepositories.REPOSITORY_TAG,
+                    MavenRepositories.REPOSITORIES_ANCHORS
+                )
+                addMissingRepositories(
+                    project,
+                    xmlFile,
+                    MavenRepositories.PLUGIN_REPOSITORIES_TAG,
+                    MavenRepositories.PLUGIN_REPOSITORY_TAG,
+                    MavenRepositories.PLUGIN_REPOSITORIES_ANCHORS
+                )
+            }
         }, xmlFile)
     }
 
@@ -78,7 +76,6 @@ class ConfigureMavenRepositoriesAction :
         for (repository in missing) {
             MavenPomEditing.addChildTag(project, section, repository.tagText(entryTagName))
         }
-        MavenPomEditing.reformat(project, section)
     }
 
     private fun declaredUrls(section: XmlTag): List<String> =

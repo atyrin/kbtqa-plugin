@@ -17,8 +17,8 @@ class MavenVersionsService : BaseVersionsService() {
     companion object {
         private const val MAVEN_REPO_URL =
             "https://repo1.maven.org/maven2/org/apache/maven/apache-maven/maven-metadata.xml"
-        private const val COMPILER_PLUGIN_REPO_URL =
-            "https://repo1.maven.org/maven2/org/apache/maven/plugins/maven-compiler-plugin/maven-metadata.xml"
+        private const val APACHE_PLUGINS_REPO_URL = "https://repo1.maven.org/maven2/org/apache/maven/plugins"
+        private const val COMPILER_PLUGIN_ARTIFACT_ID = "maven-compiler-plugin"
 
         // mvnd is not published to Maven Central, only as GitHub releases
         private const val MVND_RELEASES_URL = "https://api.github.com/repos/apache/maven-mvnd/releases?per_page=100"
@@ -36,7 +36,7 @@ class MavenVersionsService : BaseVersionsService() {
             VersionsService.VersionChannel(
                 "Maven Compiler Plugin",
                 "maven-compiler-plugin releases from Maven Central",
-                getVersionsFromUrl(COMPILER_PLUGIN_REPO_URL)
+                getMavenPluginVersions(COMPILER_PLUGIN_ARTIFACT_ID)
             ),
             VersionsService.VersionChannel(
                 "Maven Daemon",
@@ -45,6 +45,13 @@ class MavenVersionsService : BaseVersionsService() {
             )
         )
     }
+
+    /**
+     * All published versions of the Apache Maven plugin [artifactId] (e.g. `maven-compiler-plugin`),
+     * newest first; empty when Maven Central is unreachable.
+     */
+    suspend fun getMavenPluginVersions(artifactId: String): List<String> =
+        getVersionsFromUrl("$APACHE_PLUGINS_REPO_URL/$artifactId/maven-metadata.xml")
 
     private suspend fun getMvndVersions(): List<String> {
         val response = fetchHttpResponse(MVND_RELEASES_URL, mapOf("Accept" to "application/vnd.github+json"))

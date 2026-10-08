@@ -1,34 +1,30 @@
 package kbtqa.helpers.editor
 
+import com.intellij.codeInsight.hint.HintManager
 import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.editor.Editor
-import com.intellij.openapi.editor.ScrollType
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.popup.JBPopupFactory
-import com.intellij.psi.PsiDocumentManager
+import com.intellij.psi.SmartPointerManager
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.psi.xml.XmlFile
 import com.intellij.psi.xml.XmlTag
-import com.intellij.util.ui.JBUI
-import java.awt.BorderLayout
-import java.awt.Component
-import javax.swing.DefaultListCellRenderer
-import javax.swing.JList
-import javax.swing.JPanel
-import javax.swing.JSeparator
-import javax.swing.SwingConstants
+import kbtqa.helpers.editor.MavenKotlinPlugin.CONFIGURATION_TAG
 
 /**
- * Action that adds a context menu option for pom.xml files to insert Kotlin compiler properties
- * into the `<properties>` section.
+ * Action that adds a context menu option for pom.xml files to insert Kotlin and Maven compiler
+ * options, grouped as [MavenProperties.GROUPS] lists them.
  *
- * The property is added to the `<properties>` tag enclosing the caret, falling back to the one in
- * the root `<project>` tag, which is created when it does not exist yet.
+ * Properties go into the `<properties>` tag enclosing the caret, falling back to the one in the root
+ * `<project>` tag, which is created when it does not exist yet. Options that have no property
+ * counterpart go into the `<configuration>` of `kotlin-maven-plugin` instead; when the pom does not
+ * declare that plugin, a hint points to _Configure Kotlin Plugin_. Compiler plugins have an action of
+ * their own, [AddKotlinCompilerPluginAction].
  */
 class MavenPropertiesAction :
-    AnAction("Add Maven Property", "Insert a Kotlin Maven compiler property", null), DumbAware {
+    AnAction("Add Maven Property", "Insert a Kotlin or Maven compiler option", null), DumbAware {
 
     override fun getActionUpdateThread(): ActionUpdateThread {
         return ActionUpdateThread.BGT
@@ -56,49 +52,60 @@ class MavenPropertiesAction :
             .createPopupChooserBuilder(MavenProperties.ENTRIES)
             .setTitle("Select Maven Property")
             .setResizable(true)
-            .setRenderer(EntryRenderer(MavenProperties.ENTRIES_WITH_SEPARATOR_ABOVE))
-            .setItemChosenCallback { property ->
-                insertProperty(project, editor, xmlFile, property)
-                // Recreate the popup after insertion to keep it open
-                showPropertiesPopup(project, editor, xmlFile, dataContext)
+            .setRenderer(GroupedListRenderer<MavenOption>({ it.label }, { MavenProperties.GROUP_TITLES.getValue(it) }))
+            .setItemChosenCallback { option ->
+                val inserted = when (option) {
+                    is MavenProperty -> {
+                        insertProperty(project, editor, xmlFile, option)
+                        true
+                    }
+                    is KotlinPluginOption -> MavenPomEditing.editKotlinPlugin(project, editor, xmlFile, "Add Maven Property") {
+                        addPluginOption(project, it, option)
+                    }
+                }
+                if (inserted) {
+                    // Recreate the popup after insertion to keep it open
+                    showPropertiesPopup(project, editor, xmlFile, dataContext)
+                } else {
+                    HintManager.getInstance().showErrorHint(editor, MavenKotlinPlugin.NOT_DECLARED_HINT)
+                }
             }
             .createPopup()
             .showInBestPositionFor(dataContext)
     }
 
-    /** Visible for testing: the whole document mutation, independent of the popup. */
-    internal fun insertProperty(project: Project, editor: Editor, xmlFile: XmlFile, property: MavenProperty) {
+    private fun insertProperty(project: Project, editor: Editor, xmlFile: XmlFile, property: MavenProperty) {
         if (!xmlFile.isValid) return
 
         WriteCommandAction.runWriteCommandAction(project, "Add Maven Property", null, {
-            val documentManager = PsiDocumentManager.getInstance(project)
-            val document = editor.document
-            // Make the PSI tree match what the user sees before reading it
-            documentManager.commitDocument(document)
-
-            val properties = findOrCreatePropertiesTag(project, editor, xmlFile) ?: return@runWriteCommandAction
-
-            val existing = properties.findFirstSubTag(property.name)
-            val target = if (existing != null) {
+            val target = MavenPomEditing.editKeepingComments(project, xmlFile, editor.document) {
+                val properties = findOrCreatePropertiesTag(project, editor, xmlFile) ?: return@editKeepingComments null
                 // Already declared here — take the user to it instead of adding a duplicate
-                existing
-            } else {
-                addProperty(project, properties, property) ?: return@runWriteCommandAction
+                val tag = properties.findFirstSubTag(property.name)
+                    ?: MavenPomEditing.addChildTag(project, properties, property.tagText)
+                // Formatting the inserted tag may reparse it, so keep hold of the caret target through a pointer
+                SmartPointerManager.createPointer(tag)
             }
-
-            // PSI modifications block the document; offsets are only usable once it is unblocked
-            documentManager.doPostponedOperationsAndUnblockDocument(document)
-            moveCaretIntoTag(editor, target)
+            target?.element?.let { MavenPomEditing.moveCaretIntoTag(editor, it) }
         }, xmlFile)
     }
 
     /**
-     * Adds [property] to [properties] and returns the inserted tag, reformatting the surrounding
-     * block so that the new tag is indented like its siblings.
+     * Adds [option] to the plugin's `<configuration>` unless something already sets it, and returns
+     * the tag that takes the caret.
      */
-    private fun addProperty(project: Project, properties: XmlTag, property: MavenProperty): XmlTag? {
-        MavenPomEditing.addChildTag(project, properties, property.tagText)
-        return MavenPomEditing.reformat(project, properties)?.findFirstSubTag(property.name)
+    private fun addPluginOption(project: Project, plugin: XmlTag, option: KotlinPluginOption): XmlTag? {
+        val configuration = MavenPomEditing.findOrCreateChild(project, plugin, CONFIGURATION_TAG, anchors = emptyList())
+            ?: return null
+        val parent = if (option.container == null) {
+            configuration
+        } else {
+            MavenPomEditing.findOrCreateChild(project, configuration, option.container, anchors = emptyList()) ?: return null
+        }
+
+        val tag = parent.findSubTags(option.tagName).firstOrNull { option.isSetBy(it.value.text) }
+            ?: MavenPomEditing.addChildTag(project, parent, option.tagText)
+        return option.caretTag?.let { tag.findFirstSubTag(it) } ?: tag
     }
 
     /**
@@ -129,39 +136,5 @@ class MavenPropertiesAction :
             tag = tag.parentTag
         }
         return null
-    }
-
-    private fun moveCaretIntoTag(editor: Editor, tag: XmlTag) {
-        if (!tag.isValid) return
-        val offset = tag.textRange.startOffset + MavenProperties.caretOffsetInTagText(tag.text)
-        editor.selectionModel.removeSelection()
-        editor.caretModel.moveToOffset(offset)
-        editor.scrollingModel.scrollToCaret(ScrollType.MAKE_VISIBLE)
-    }
-
-    /** Draws a non-clickable separator line above the first entry of each property group. */
-    private class EntryRenderer(
-        private val separatorsAbove: Set<MavenProperty>
-    ) : javax.swing.ListCellRenderer<MavenProperty> {
-        private val defaultRenderer = DefaultListCellRenderer()
-
-        override fun getListCellRendererComponent(
-            list: JList<out MavenProperty>,
-            value: MavenProperty,
-            index: Int,
-            isSelected: Boolean,
-            cellHasFocus: Boolean
-        ): Component {
-            val base = defaultRenderer.getListCellRendererComponent(list, value.label, index, isSelected, cellHasFocus)
-            if (!separatorsAbove.contains(value)) return base
-
-            val panel = JPanel(BorderLayout())
-            panel.border = JBUI.Borders.empty(4, 0, 0, 0)
-            panel.add(JSeparator(SwingConstants.HORIZONTAL), BorderLayout.NORTH)
-            panel.add(base, BorderLayout.CENTER)
-            panel.isOpaque = true
-            panel.background = list.background
-            return panel
-        }
     }
 }
