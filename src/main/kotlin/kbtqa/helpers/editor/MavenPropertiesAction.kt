@@ -12,6 +12,7 @@ import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.psi.xml.XmlFile
 import com.intellij.psi.xml.XmlTag
 import kbtqa.helpers.editor.MavenKotlinPlugin.CONFIGURATION_TAG
+import org.jetbrains.annotations.VisibleForTesting
 
 /**
  * Action that adds a context menu option for pom.xml files to insert Kotlin and Maven compiler
@@ -59,9 +60,7 @@ class MavenPropertiesAction :
                         insertProperty(project, editor, xmlFile, option)
                         true
                     }
-                    is KotlinPluginOption -> MavenPomEditing.editKotlinPlugin(project, editor, xmlFile, "Add Maven Property") {
-                        addPluginOption(project, it, option)
-                    }
+                    is KotlinPluginOption -> insertPluginOption(project, editor, xmlFile, option)
                 }
                 if (inserted) {
                     // Recreate the popup after insertion to keep it open
@@ -74,7 +73,9 @@ class MavenPropertiesAction :
             .showInBestPositionFor(dataContext)
     }
 
-    private fun insertProperty(project: Project, editor: Editor, xmlFile: XmlFile, property: MavenProperty) {
+    /** What choosing [property] in the popup does. */
+    @VisibleForTesting
+    internal fun insertProperty(project: Project, editor: Editor, xmlFile: XmlFile, property: MavenProperty) {
         if (!xmlFile.isValid) return
 
         WriteCommandAction.runWriteCommandAction(project, "Add Maven Property", null, {
@@ -89,6 +90,16 @@ class MavenPropertiesAction :
             target?.element?.let { MavenPomEditing.moveCaretIntoTag(editor, it) }
         }, xmlFile)
     }
+
+    /**
+     * What choosing [option] in the popup does. Returns `false`, changing nothing, when the pom does
+     * not declare `kotlin-maven-plugin`.
+     */
+    @VisibleForTesting
+    internal fun insertPluginOption(project: Project, editor: Editor, xmlFile: XmlFile, option: KotlinPluginOption): Boolean =
+        MavenPomEditing.editKotlinPlugin(project, editor, xmlFile, "Add Maven Property") {
+            addPluginOption(project, it, option)
+        }
 
     /**
      * Adds [option] to the plugin's `<configuration>` unless something already sets it, and returns

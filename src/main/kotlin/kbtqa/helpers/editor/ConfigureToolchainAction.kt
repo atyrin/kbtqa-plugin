@@ -15,6 +15,7 @@ import kbtqa.helpers.editor.MavenKotlinPlugin.EXECUTIONS_ANCHORS
 import kbtqa.helpers.editor.MavenKotlinPlugin.EXECUTIONS_TAG
 import kbtqa.helpers.editor.MavenKotlinPlugin.PLUGINS_TAG
 import kbtqa.helpers.editor.MavenKotlinPlugin.VERSION_TAG
+import org.jetbrains.annotations.VisibleForTesting
 
 /**
  * Action that adds a context menu option for pom.xml files to pin the compilation JDK with
@@ -69,7 +70,8 @@ class ConfigureToolchainAction :
     }
 
     /** [pluginVersion] is only used when the plugin has to be declared; an existing one keeps its own. */
-    private fun configureToolchain(project: Project, xmlFile: XmlFile, editor: Editor?, pluginVersion: String) {
+    @VisibleForTesting
+    internal fun configureToolchain(project: Project, xmlFile: XmlFile, editor: Editor?, pluginVersion: String) {
         if (!xmlFile.isValid) return
 
         WriteCommandAction.runWriteCommandAction(project, "Configure JDK Toolchain", null, {
